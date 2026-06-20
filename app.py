@@ -1,6 +1,5 @@
 from flask import Flask, render_template, jsonify
 from models.film import session, Film, PriceHistory
-import pandas as pd
 from datetime import datetime, timedelta
 
 app = Flask(__name__)

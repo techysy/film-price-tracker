@@ -15,7 +15,7 @@ def run_spiders():
         # 运行京东爬虫
         result = subprocess.run(
             ['scrapy', 'crawl', 'jd'],
-            cwd='f:/Files/GitHub Files/film-price-tracker',
+            cwd='f:/Files/GitHub Files/FilmPriceTracker',
             capture_output=True,
             text=True
         )
@@ -24,9 +24,21 @@ def run_spiders():
             logger.info(f"标准输出: {result.stdout}")
         if result.stderr:
             logger.warning(f"标准错误: {result.stderr}")
+
+        # 运行淘宝爬虫
+        result = subprocess.run(
+            ['scrapy', 'crawl', 'taobao'],
+            cwd='f:/Files/GitHub Files/FilmPriceTracker',
+            capture_output=True,
+            text=True
+        )
+        logger.info(f"淘宝爬虫运行结果: {result.returncode}")
+        if result.stdout:
+            logger.info(f"标准输出: {result.stdout}")
+        if result.stderr:
+            logger.warning(f"标准错误: {result.stderr}")
         
         # 可以添加其他平台的爬虫
-        # subprocess.run(['scrapy', 'crawl', 'taobao'], ...)
         # subprocess.run(['scrapy', 'crawl', 'amazon'], ...)
         
         logger.info("爬虫运行完成")

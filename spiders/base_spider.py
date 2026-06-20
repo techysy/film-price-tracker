@@ -1,5 +1,5 @@
 import scrapy
-from ..models.film import session, Film, PriceHistory
+from models.film import session, Film, PriceHistory
 
 class BaseFilmSpider(scrapy.Spider):
     """基础爬虫类，提供通用功能"""

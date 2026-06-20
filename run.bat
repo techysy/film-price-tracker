@@ -1,4 +1,7 @@
 @echo off
+chcp 65001 >nul
+
+cd /d "%~dp0"
 
 REM 简单的启动脚本
 
