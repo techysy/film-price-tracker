@@ -1,9 +1,8 @@
 import scrapy
-from models.film import session, Film, PriceHistory
+from models.film import SessionLocal, Film, PriceHistory
+
 
 class BaseFilmSpider(scrapy.Spider):
-    """基础爬虫类，提供通用功能"""
-    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.film_brands = [
@@ -14,11 +13,13 @@ class BaseFilmSpider(scrapy.Spider):
             'lomography', '乐魔'
         ]
         self.film_formats = ['35mm', '120', '135']
-    
+        self.session = SessionLocal()
+
+    def closed(self, reason):
+        self.session.close()
+
     def save_price(self, brand, model, platform, price, url, iso=None, film_format=None):
-        """保存价格数据到数据库"""
-        # 查找或创建胶卷记录
-        film = session.query(Film).filter_by(brand=brand, model=model).first()
+        film = self.session.query(Film).filter_by(brand=brand, model=model).first()
         if not film:
             film = Film(
                 brand=brand,
@@ -26,17 +27,16 @@ class BaseFilmSpider(scrapy.Spider):
                 iso=iso,
                 format=film_format
             )
-            session.add(film)
-            session.commit()
-        
-        # 创建价格历史记录
+            self.session.add(film)
+            self.session.commit()
+
         price_history = PriceHistory(
             film_id=film.id,
             platform=platform,
             price=price,
             url=url
         )
-        session.add(price_history)
-        session.commit()
-        
+        self.session.add(price_history)
+        self.session.commit()
+
         self.logger.info(f"Saved price for {brand} {model} on {platform}: ¥{price}")

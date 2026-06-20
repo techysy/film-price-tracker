@@ -1,56 +1,37 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>胶卷价格追踪</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-light">
-        <div class="container">
-            <a class="navbar-brand" href="/">胶卷价格追踪</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/">首页</a>
-                    </li>
-                </ul>
+{% extends "base.html" %}
+
+{% block title %}胶卷价格追踪{% endblock %}
+
+{% block content %}
+<div class="text-center mb-5">
+    <h1>胶卷价格追踪</h1>
+    <p class="text-muted">实时监控各大平台胶卷价格，查看历史趋势</p>
+</div>
+
+<div class="row">
+    {% if films %}
+        {% for film in films %}
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">{{ film.brand }} {{ film.model }}</h5>
+                    <p class="card-text">
+                        {% if film.iso %}ISO: {{ film.iso }}{% endif %}
+                        {% if film.format %} | 格式: {{ film.format }}{% endif %}
+                    </p>
+                    <a href="/film/{{ film.id }}" class="btn btn-primary">查看价格趋势</a>
+                </div>
             </div>
         </div>
-    </nav>
-
-    <div class="container mt-4">
-        <h1 class="text-center mb-4">胶卷价格追踪</h1>
-        <p class="text-center text-muted">实时监控各大平台胶卷价格，查看历史趋势</p>
-
-        <div class="row mt-4">
-            {% if films %}
-                {% for film in films %}
-                <div class="col-md-4 mb-4">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title">{{ film.brand }} {{ film.model }}</h5>
-                            <p class="card-text">
-                                {% if film.iso %}ISO: {{ film.iso }}{% endif %}
-                                {% if film.format %} | 格式: {{ film.format }}{% endif %}
-                            </p>
-                            <a href="/film/{{ film.id }}" class="btn btn-primary">查看价格趋势</a>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            {% else %}
-                <div class="col-12 text-center">
+        {% endfor %}
+    {% else %}
+        <div class="col-12">
+            <div class="card empty-state">
+                <div class="card-body">
                     <p class="text-muted">暂无胶卷数据，请运行爬虫获取数据</p>
                 </div>
-            {% endif %}
+            </div>
         </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+    {% endif %}
+</div>
+{% endblock %}

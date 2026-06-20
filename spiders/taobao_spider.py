@@ -1,8 +1,7 @@
-from .base_spider import BaseFilmSpider
+from spiders.base_spider import BaseFilmSpider
 import scrapy
 import re
 import json
-from urllib.parse import quote
 
 
 class TaobaoSpider(BaseFilmSpider):
