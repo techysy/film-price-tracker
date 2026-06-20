@@ -4,6 +4,7 @@
 
 {% block extra_css %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -28,7 +29,7 @@
                 <p class="card-text">
                     {% if platforms %}
                         监控平台: {{ platforms.keys()|join(', ') }}<br>
-                        数据点: {{ platforms.values()|sum(attribute='length') }}
+                        数据点: {{ platforms.values()|map('length')|sum }}
                     {% else %}
                         暂无价格数据
                     {% endif %}

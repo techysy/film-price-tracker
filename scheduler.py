@@ -2,6 +2,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import subprocess
 import logging
+import threading
 from config import config
 
 logging.basicConfig(level=logging.INFO,
@@ -62,10 +63,10 @@ def start_scheduler():
 
 if __name__ == '__main__':
     scheduler = start_scheduler()
+    shutdown_event = threading.Event()
 
     try:
-        while True:
-            pass
+        shutdown_event.wait()
     except (KeyboardInterrupt, SystemExit):
         scheduler.shutdown()
         logger.info("定时任务调度器已关闭")

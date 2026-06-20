@@ -66,7 +66,7 @@
 
 启动成功后，在浏览器中访问：
 ```
-http://localhost:5000
+http://localhost:5001
 ```
 
 ## 常见问题
@@ -98,34 +98,46 @@ http://localhost:5000
 
 ### 4. 爬虫无法运行
 
+注意：京东和淘宝均有较强的反爬机制，爬虫可能无法稳定抓取数据。
+
 **解决方案**：
-- 检查scheduler.py中的路径配置是否正确
-- 确保Scrapy已正确安装
-- 尝试手动运行爬虫：
+- 确保在项目根目录运行爬虫：
   ```powershell
+  cd f:\Files\GitHub Files\film-price-tracker
   scrapy crawl jd
   ```
+- 确保Scrapy已正确安装
+- 检查网络连接是否正常
 
 ## 项目结构
 
 ```
 film-price-tracker/
 ├── film_price_tracker/  # Scrapy项目配置
+│   ├── __init__.py
 │   └── settings.py
 ├── models/  # 数据模型
 │   ├── __init__.py
 │   └── film.py
 ├── spiders/  # 爬虫
+│   ├── __init__.py
 │   ├── base_spider.py
-│   └── jd_spider.py
+│   ├── jd_spider.py
+│   └── taobao_spider.py
 ├── templates/  # 前端模板
+│   ├── base.html
 │   ├── film_detail.html
 │   └── index.html
-├── app.py  # Flask应用
-├── requirements.txt  # 依赖
+├── static/  # 静态资源
+│   └── css/style.css
+├── app.py  # Flask应用入口
+├── app_factory.py  # Flask工厂
+├── app_routes.py  # 路由
+├── config.py  # 配置
 ├── scheduler.py  # 定时任务
 ├── scrapy.cfg  # Scrapy配置
-├── start.bat  # Windows启动脚本
+├── requirements.txt  # 依赖
+├── start.bat  # Windows CMD启动脚本
 └── start.ps1  # PowerShell启动脚本
 ```
 

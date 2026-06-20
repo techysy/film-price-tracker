@@ -1,42 +1,73 @@
 from spiders.base_spider import BaseFilmSpider
 import scrapy
 import re
-import json
 
 
 class TaobaoSpider(BaseFilmSpider):
     name = 'taobao'
+    allowed_domains = ['taobao.com']
     start_urls = [
-        'https://h5api.m.taobao.com/h5/mtop.taobao.searchapi.search/1.0/?jsv=2.7.0&appKey=12574478&t=1718856000&sign=xxx&api=mtop.taobao.searchapi.search&v=1.0&dataType=json&timeout=20000&AntiCreep=true&type=jsonp&callback=mtopjsonp1&data=%7B%22query%22%3A%22%E8%83%B6%E5%8D%B7%22%2C%22page%22%3A1%2C%22pageSize%22%3A20%7D',
-        'https://h5api.m.taobao.com/h5/mtop.taobao.searchapi.search/1.0/?jsv=2.7.0&appKey=12574478&t=1718856000&sign=xxx&api=mtop.taobao.searchapi.search&v=1.0&dataType=json&timeout=20000&AntiCreep=true&type=jsonp&callback=mtopjsonp1&data=%7B%22query%22%3A%22%E6%9F%AF%E8%BE%BE%E8%83%B6%E5%8D%B7%22%2C%22page%22%3A1%2C%22pageSize%22%3A20%7D',
-        'https://h5api.m.taobao.com/h5/mtop.taobao.searchapi.search/1.0/?jsv=2.7.0&appKey=12574478&t=1718856000&sign=xxx&api=mtop.taobao.searchapi.search&v=1.0&dataType=json&timeout=20000&AntiCreep=true&type=jsonp&callback=mtopjsonp1&data=%7B%22query%22%3A%22%E5%AF%8C%E5%A3%AB%E8%83%B6%E5%8D%B7%22%2C%22page%22%3A1%2C%22pageSize%22%3A20%7D',
-        'https://h5api.m.taobao.com/h5/mtop.taobao.searchapi.search/1.0/?jsv=2.7.0&appKey=12574478&t=1718856000&sign=xxx&api=mtop.taobao.searchapi.search&v=1.0&dataType=json&timeout=20000&AntiCreep=true&type=jsonp&callback=mtopjsonp1&data=%7B%22query%22%3A%22%E4%BC%8A%E5%B0%94%E7%A6%8F%E8%83%B6%E5%8D%B7%22%2C%22page%22%3A1%2C%22pageSize%22%3A20%7D'
+        'https://s.taobao.com/search?q=胶卷&bcoffset=0',
+        'https://s.taobao.com/search?q=柯达胶卷&bcoffset=0',
+        'https://s.taobao.com/search?q=富士胶卷&bcoffset=0',
+        'https://s.taobao.com/search?q=伊尔福胶卷&bcoffset=0',
     ]
 
     def parse(self, response):
-        try:
-            json_str = re.search(r'mtopjsonp1\((.*?)\)', response.text)
-            if not json_str:
-                return
-            data = json.loads(json_str.group(1))
-            if data.get('ret') and 'SUCCESS' not in data['ret'][0]:
-                return
-            result = data.get('data', {})
-            items = result.get('resultList', [])
-            for item in items:
-                if isinstance(item, dict):
-                    name = item.get('title', '') or item.get('rawTitle', '')
-                    if not name:
-                        continue
-                    price = item.get('price', '')
-                    if not price:
-                        continue
-                    url = item.get('itemUrl', '') or f'https://item.taobao.com/item.htm?id={item.get("itemId", "")}'
-                    if url and not url.startswith('http'):
-                        url = 'https:' + url
-                    brand, model, iso, film_format = self.parse_product_name(name)
-                    if brand:
-                        price = float(re.sub('[^0-9.]', '', str(price)))
-                        self.save_price(brand=brand, model=model, platform='淘宝', price=price, url=url, iso=iso, film_format=film_format)
-        except Exception as e:
-            self.logger.error(f'Error parsing taobao API: {e}')
+        products = response.css('.items .item')
+
+        for product in products:
+            name = product.css('.title a::text').get()
+            if not name:
+                name = product.css('.title::text').get()
+            if not name:
+                continue
+
+            price = product.css('.price strong::text').get()
+            if not price:
+                continue
+
+            url = product.css('.title a::attr(href)').get()
+            if url and not url.startswith('http'):
+                url = 'https:' + url if url.startswith('//') else 'https://www.taobao.com' + url
+
+            brand, model, iso, film_format = self.parse_product_name(name.strip())
+
+            if brand:
+                price = float(re.sub('[^0-9.]', '', price))
+                self.save_price(
+                    brand=brand,
+                    model=model,
+                    platform='淘宝',
+                    price=price,
+                    url=url,
+                    iso=iso,
+                    film_format=film_format
+                )
+
+    def parse_product_name(self, name):
+        brand = None
+        model = name
+        iso = None
+        film_format = None
+
+        for b in self.film_brands:
+            if b in name:
+                brand = b
+                model = name.replace(b, '').strip()
+                break
+
+        iso_match = re.search(r'ISO(\d+)', name, re.IGNORECASE)
+        if not iso_match:
+            iso_match = re.search(r'(\d+)度', name)
+        if iso_match:
+            iso = int(iso_match.group(1))
+
+        for fmt in self.film_formats:
+            if fmt in name:
+                film_format = fmt
+                break
+        if '135' in name:
+            film_format = '35mm'
+
+        return brand, model, iso, film_format
