@@ -94,7 +94,7 @@ def parse_product_name(name):
         elif '5x7' in name or '8x10' in name:
             film_format = '大画幅'
 
-    if film_format and '拍立得' in film_format or '宝丽来' in film_format:
+    if film_format and ('拍立得' in film_format or '宝丽来' in film_format):
         if '黑白' in name or 'b&w' in name_lower:
             film_type = '黑白一次成像'
         elif '彩色' in name or 'color' in name_lower:
@@ -338,6 +338,163 @@ def export_html():
         session.close()
 
 
+@main.route('/films')
+def films():
+    session = SessionLocal()
+    try:
+        film_list = session.query(Film).order_by(Film.brand, Film.model).all()
+        return render_template('films.html', films=film_list)
+    finally:
+        session.close()
+
+
+@main.route('/films/add', methods=['POST'])
+def film_add():
+    brand = request.form.get('brand', '').strip()
+    model = request.form.get('model', '').strip()
+    film_format = request.form.get('format', '').strip() or None
+    film_type = request.form.get('film_type', '').strip() or None
+    iso = request.form.get('iso', '').strip()
+    iso = int(iso) if iso and iso.isdigit() else None
+    expiry = request.form.get('expiry', '').strip() or None
+    if not brand or not model:
+        flash('品牌和型号不能为空', 'danger')
+        return redirect(url_for('main.films'))
+    session = SessionLocal()
+    try:
+        film = Film(brand=brand, model=model, format=film_format,
+                    film_type=film_type, iso=iso, expiry=expiry)
+        session.add(film)
+        session.commit()
+        flash(f'胶片 "{brand} {model}" 添加成功', 'success')
+    except Exception as e:
+        session.rollback()
+        flash(f'添加失败: {e}', 'danger')
+    finally:
+        session.close()
+    return redirect(url_for('main.films'))
+
+
+@main.route('/films/edit/<int:film_id>', methods=['POST'])
+def film_edit(film_id):
+    session = SessionLocal()
+    try:
+        film = session.query(Film).get(film_id)
+        if not film:
+            flash('胶片不存在', 'danger')
+            return redirect(url_for('main.films'))
+        brand = request.form.get('brand', '').strip()
+        model = request.form.get('model', '').strip()
+        film_format = request.form.get('format', '').strip() or None
+        film_type = request.form.get('film_type', '').strip() or None
+        iso = request.form.get('iso', '').strip()
+        iso = int(iso) if iso and iso.isdigit() else None
+        expiry = request.form.get('expiry', '').strip() or None
+        if brand:
+            film.brand = brand
+        if model:
+            film.model = model
+        film.format = film_format
+        film.film_type = film_type
+        film.iso = iso
+        film.expiry = expiry
+        session.commit()
+        flash(f'胶片 "{film.brand} {film.model}" 已更新', 'success')
+    except Exception as e:
+        session.rollback()
+        flash(f'更新失败: {e}', 'danger')
+    finally:
+        session.close()
+    return redirect(url_for('main.films'))
+
+
+@main.route('/films/delete/<int:film_id>', methods=['POST'])
+def film_delete(film_id):
+    session = SessionLocal()
+    try:
+        film = session.query(Film).get(film_id)
+        if not film:
+            flash('胶片不存在', 'danger')
+            return redirect(url_for('main.films'))
+        name = f'{film.brand} {film.model}'
+        session.query(PriceHistory).filter_by(film_id=film.id).delete()
+        session.delete(film)
+        session.commit()
+        flash(f'胶片 "{name}" 已删除', 'success')
+    except Exception as e:
+        session.rollback()
+        flash(f'删除失败: {e}', 'danger')
+    finally:
+        session.close()
+    return redirect(url_for('main.films'))
+
+
+@main.route('/api/films/list')
+def api_films_list():
+    session = SessionLocal()
+    try:
+        films = session.query(Film).all()
+        return jsonify([{
+            'id': f.id, 'brand': f.brand, 'model': f.model,
+            'format': f.format, 'film_type': f.film_type,
+            'iso': f.iso, 'expiry': f.expiry
+        } for f in films])
+    finally:
+        session.close()
+
+
+@main.route('/api/films/match', methods=['POST'])
+def api_film_match():
+    data = request.get_json()
+    if not data or 'title' not in data:
+        return jsonify({'film_id': None})
+
+    title = data['title'].lower()
+    session = SessionLocal()
+    try:
+        films = session.query(Film).all()
+        best = None
+        best_score = 0
+        for film in films:
+            score = 0
+            name = f'{film.brand} {film.model}'.lower()
+            brand_l = (film.brand or '').lower()
+            if brand_l and brand_l in title:
+                score += 10
+            if film.iso:
+                iso_str = str(film.iso)
+                if iso_str in title:
+                    score += 5
+            if film.format:
+                fmt = film.format.lower()
+                if '35mm' in fmt and ('135' in title or '35mm' in title):
+                    score += 5
+                elif '120' in fmt and '120' in title:
+                    score += 5
+                elif fmt in title:
+                    score += 5
+            if film.film_type:
+                ft = film.film_type.lower()
+                if '彩负' in ft and ('彩负' in title or 'color' in title or '彩色负片' in title):
+                    score += 3
+                elif '黑白' in ft and ('黑白' in title or 'b&w' in title):
+                    score += 3
+                elif '反转' in ft and ('反转' in title or 'slide' in title):
+                    score += 3
+                elif '电影卷' in ft and ('电影卷' in title or 'vision' in title):
+                    score += 3
+                elif '一次成像' in ft and ('一次成像' in title or 'instax' in title or 'polaroid' in title):
+                    score += 3
+            if score > best_score:
+                best_score = score
+                best = film
+        if best and best_score >= 5:
+            return jsonify({'film_id': best.id, 'brand': best.brand, 'model': best.model, 'score': best_score})
+        return jsonify({'film_id': None})
+    finally:
+        session.close()
+
+
 @main.route('/stores')
 def stores():
     session = SessionLocal()
@@ -367,6 +524,36 @@ def store_add():
     finally:
         session.close()
     return redirect(url_for('main.stores'))
+
+
+@main.route('/api/stores/import', methods=['POST'])
+def api_stores_import():
+    data = request.get_json()
+    if not data or 'stores' not in data:
+        return jsonify({'error': '没有要导入的数据'}), 400
+
+    stores = data['stores']
+    session = SessionLocal()
+    imported = 0
+    try:
+        for item in stores:
+            name = item.get('name', '').strip()
+            url = item.get('url', '').strip()
+            if not name or not url:
+                continue
+            existing = session.query(TaobaoStore).filter_by(url=url).first()
+            if existing:
+                continue
+            session.add(TaobaoStore(name=name, url=url))
+            imported += 1
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': f'导入失败: {str(e)}'}), 500
+    finally:
+        session.close()
+
+    return jsonify({'imported': imported})
 
 
 @main.route('/stores/edit/<int:store_id>', methods=['POST'])
@@ -462,30 +649,28 @@ def api_save():
     items = data['items']
     session = SessionLocal()
     saved = 0
+    skipped = 0
     try:
+        all_films = session.query(Film).all()
         for item in items:
             title = item.get('title', '').strip()
             price = item.get('price', 0)
             store_name = item.get('store', '未知店铺')
             url = item.get('url', '')
+            force_film_id = item.get('film_id')
 
             if not title or price <= 0:
                 continue
 
-            info = parse_product_name(title)
-            brand = info['brand']
-            model = info['model']
-            iso = info['iso']
-            film_format = info['format']
-            film_type = info['film_type']
-            expiry = info['expiry']
+            film = None
+            if force_film_id:
+                film = session.query(Film).get(force_film_id)
+            else:
+                film = _match_film(title, all_films)
 
-            film = session.query(Film).filter_by(brand=brand, model=model).first()
             if not film:
-                film = Film(brand=brand, model=title[:100], iso=iso, format=film_format,
-                            film_type=film_type, expiry=expiry)
-                session.add(film)
-                session.commit()
+                skipped += 1
+                continue
 
             ph = PriceHistory(film_id=film.id, platform=store_name, price=price, url=url)
             session.add(ph)
@@ -496,5 +681,46 @@ def api_save():
         return jsonify({'error': f'保存失败: {str(e)}'}), 500
     finally:
         session.close()
+
+    return jsonify({'saved': saved, 'skipped': skipped})
+
+
+def _match_film(title, all_films):
+    title_lower = title.lower()
+    best = None
+    best_score = 0
+    for film in all_films:
+        score = 0
+        brand_l = (film.brand or '').lower()
+        if brand_l and brand_l in title_lower:
+            score += 10
+        if film.iso and str(film.iso) in title_lower:
+            score += 5
+        if film.format:
+            fmt = film.format.lower()
+            if '35mm' in fmt and ('135' in title_lower or '35mm' in title_lower):
+                score += 5
+            elif '120' in fmt and '120' in title_lower:
+                score += 5
+            elif fmt in title_lower:
+                score += 5
+        if film.film_type:
+            ft = film.film_type.lower()
+            if '彩负' in ft and ('彩负' in title_lower or 'color' in title_lower or '彩色负片' in title_lower):
+                score += 3
+            elif '黑白' in ft and ('黑白' in title_lower or 'b&w' in title_lower):
+                score += 3
+            elif '反转' in ft and ('反转' in title_lower or 'slide' in title_lower):
+                score += 3
+            elif '电影卷' in ft and ('电影卷' in title_lower or 'vision' in title_lower):
+                score += 3
+            elif '一次成像' in ft and ('一次成像' in title_lower or 'instax' in title_lower or 'polaroid' in title_lower):
+                score += 3
+        if score > best_score:
+            best_score = score
+            best = film
+    if best and best_score >= 5:
+        return best
+    return None
 
     return jsonify({'saved': saved})

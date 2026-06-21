@@ -32,7 +32,30 @@
     </form>
 </div>
 
+<div class="store-import-card" id="import-section" {% if stores %}style="display:none;"{% endif %}>
+    <div class="store-import-header" onclick="var b=document.getElementById('import-body');var a=document.getElementById('import-arrow');var show=b.style.display==='none';b.style.display=show?'block':'none';a.style.transform=show?'rotate(180deg)':'';">
+        <div class="store-add-icon" style="background: var(--success-bg); color: var(--success);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+        </div>
+        <span style="font-weight: 500; color: var(--text-heading);">批量导入店铺</span>
+        <span style="color: var(--text-muted); font-size: 0.8rem; margin-left: auto;">粘贴表格数据，自动识别名称和链接</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-muted); margin-left: 0.5rem; transition: transform 0.2s;" id="import-arrow"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div id="import-body" style="display: none; padding: 0 1.5rem 1.25rem;">
+        <textarea id="import-text" class="store-textarea" rows="6" placeholder="粘贴表格数据，每行一个店铺&#10;支持格式：名称[Tab/空格]链接&#10;&#10;示例：&#10;FilmWharf 菲林码头	https://filmwharf.taobao.com/&#10;搬运工	https://shop60042900.taobao.com/"></textarea>
+        <div class="d-flex gap-2 align-items-center mt-2">
+            <button type="button" class="store-add-btn" onclick="doImport()">导入</button>
+            <span id="import-status" style="font-size: 0.85rem;"></span>
+        </div>
+    </div>
+</div>
+
 {% if stores %}
+<div class="mb-3" style="text-align:right;">
+    <button class="btn btn-sm" onclick="document.getElementById('import-section').style.display='block'; document.getElementById('import-body').style.display='block'; document.getElementById('import-arrow').style.transform='rotate(180deg)'; this.style.display='none';" style="color:var(--text-muted); font-size:0.8rem; border:1px solid var(--border); border-radius:8px; padding:0.3rem 0.8rem;">批量导入更多</button>
+</div>
 <div class="store-grid">
     {% for store in stores %}
     <div class="store-card">
@@ -119,189 +142,49 @@
 </div>
 {% endif %}
 
-<style>
-.store-add-card {
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 1.25rem 1.5rem;
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-.store-add-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    background: var(--primary-soft);
-    color: var(--accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-.store-add-form {
-    display: flex;
-    gap: 0.75rem;
-    flex: 1;
-    align-items: center;
-}
-.store-input {
-    background: var(--bg-input);
-    border: 1px solid var(--border-input);
-    color: var(--text);
-    border-radius: 10px;
-    padding: 0.6rem 1rem;
-    font-size: 0.9rem;
-    outline: none;
-    transition: border-color 0.2s;
-}
-.store-input:focus {
-    border-color: var(--border-input-focus);
-}
-.store-input:first-child {
-    flex: 0 0 200px;
-}
-.store-input-url {
-    flex: 1;
-}
-.store-add-btn {
-    background: var(--primary);
-    color: #fff;
-    border: none;
-    border-radius: 10px;
-    padding: 0.6rem 1.25rem;
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: opacity 0.2s;
-}
-.store-add-btn:hover {
-    opacity: 0.9;
-}
+<script>
+async function doImport() {
+    var text = document.getElementById('import-text').value.trim();
+    var status = document.getElementById('import-status');
+    if (!text) { status.innerHTML = '<span style="color:var(--danger);">请粘贴数据</span>'; return; }
 
-.store-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 1rem;
-}
-.store-card {
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 1.25rem;
-    transition: border-color 0.2s, box-shadow 0.2s;
-}
-.store-card:hover {
-    border-color: var(--border-hover);
-    box-shadow: var(--shadow-sm);
-}
-.store-card-header {
-    display: flex;
-    align-items: center;
-    gap: 0.85rem;
-    margin-bottom: 0.85rem;
-}
-.store-avatar {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, var(--primary-soft), rgba(192, 132, 252, 0.15));
-    color: var(--accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 1rem;
-    flex-shrink: 0;
-}
-.store-info {
-    min-width: 0;
-}
-.store-name {
-    font-weight: 600;
-    color: var(--text-heading);
-    font-size: 0.95rem;
-    margin-bottom: 0.15rem;
-}
-.store-url {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    text-decoration: none;
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    transition: color 0.2s;
-}
-.store-url:hover {
-    color: var(--text-link);
-}
-.store-card-meta {
-    margin-bottom: 1rem;
-}
-.store-date {
-    font-size: 0.75rem;
-    color: var(--text-faint);
-}
-.store-card-actions {
-    display: flex;
-    gap: 0.5rem;
-    padding-top: 0.85rem;
-    border-top: 1px solid var(--border);
-}
-.store-action-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.4rem 0.75rem;
-    border-radius: 8px;
-    font-size: 0.78rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: 1px solid transparent;
-    text-decoration: none;
-    background: none;
-}
-.store-action-visit {
-    color: var(--success);
-    background: var(--success-bg);
-    border-color: var(--success-border);
-}
-.store-action-visit:hover {
-    background: rgba(34, 197, 94, 0.2);
-}
-.store-action-edit {
-    color: var(--accent);
-    background: var(--primary-soft);
-    border-color: var(--primary-border);
-}
-.store-action-edit:hover {
-    background: rgba(99, 102, 241, 0.2);
-}
-.store-action-delete {
-    color: var(--danger);
-    background: var(--danger-glow);
-    border-color: var(--danger-border);
-}
-.store-action-delete:hover {
-    background: rgba(239, 68, 68, 0.15);
-}
+    var lines = text.split('\n');
+    var stores = [];
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line) continue;
+        var parts = line.split(/\t/);
+        if (parts.length < 2) {
+            parts = line.split(/\s{2,}/);
+        }
+        if (parts.length >= 2) {
+            var name = parts[0].trim();
+            var url = parts[1].trim();
+            if (url.match(/^https?:\/\//)) {
+                stores.push({name: name, url: url});
+            }
+        }
+    }
+    if (stores.length === 0) { status.innerHTML = '<span style="color:var(--danger);">未识别到有效数据</span>'; return; }
 
-@media (max-width: 640px) {
-    .store-add-form {
-        flex-direction: column;
-    }
-    .store-input:first-child {
-        flex: none;
-        width: 100%;
-    }
-    .store-grid {
-        grid-template-columns: 1fr;
+    status.innerHTML = '<span style="color:var(--text-muted);">导入中...</span>';
+    try {
+        var resp = await fetch('/api/stores/import', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({stores: stores})
+        });
+        var data = await resp.json();
+        if (data.error) {
+            status.innerHTML = '<span style="color:var(--danger);">' + data.error + '</span>';
+        } else {
+            status.innerHTML = '<span style="color:var(--success);">成功导入 ' + data.imported + ' 家店铺</span>';
+            document.getElementById('import-section').style.display = 'none';
+            setTimeout(function() { location.reload(); }, 1000);
+        }
+    } catch(e) {
+        status.innerHTML = '<span style="color:var(--danger);">导入失败: ' + e.message + '</span>';
     }
 }
-</style>
+</script>
 {% endblock %}

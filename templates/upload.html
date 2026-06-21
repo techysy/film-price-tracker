@@ -151,20 +151,62 @@
         }
     });
 
+    let allFilms = [];
+
+    async function loadFilms() {
+        try {
+            const resp = await fetch('/api/films/list');
+            if (resp.ok) allFilms = await resp.json();
+        } catch(e) {}
+    }
+    loadFilms();
+
+    function matchFilm(item) {
+        let best = null, bestScore = 0;
+        const title = (item.title || '').toLowerCase();
+        for (const f of allFilms) {
+            let score = 0;
+            const brand = (f.brand || '').toLowerCase();
+            if (brand && title.includes(brand)) score += 10;
+            if (f.iso && title.includes(String(f.iso))) score += 5;
+            if (f.format) {
+                const fmt = f.format.toLowerCase();
+                if (fmt.includes('35mm') && (title.includes('135') || title.includes('35mm'))) score += 5;
+                else if (fmt.includes('120') && title.includes('120')) score += 5;
+                else if (title.includes(fmt)) score += 5;
+            }
+            if (f.film_type) {
+                const ft = f.film_type.toLowerCase();
+                if (ft.includes('彩负') && (title.includes('彩负') || title.includes('color'))) score += 3;
+                else if (ft.includes('黑白') && (title.includes('黑白') || title.includes('b&w'))) score += 3;
+                else if (ft.includes('反转') && (title.includes('反转') || title.includes('slide'))) score += 3;
+                else if (ft.includes('电影卷') && (title.includes('电影卷') || title.includes('vision'))) score += 3;
+                else if (ft.includes('一次成像') && (title.includes('instax') || title.includes('polaroid'))) score += 3;
+            }
+            if (score > bestScore) { bestScore = score; best = f; }
+        }
+        return bestScore >= 5 ? best : null;
+    }
+
     function renderItems(items) {
-        let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr><th>店铺</th><th>商品</th><th>解析</th><th>价格</th><th></th></tr></thead><tbody>';
+        let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr><th>店铺</th><th>商品</th><th>匹配胶片</th><th>价格</th><th></th></tr></thead><tbody>';
         items.forEach((item, i) => {
-            let tags = [];
-            if (item.brand && item.brand !== '其他') tags.push(`<span class="badge" style="background:var(--primary-soft);color:var(--accent);border:1px solid var(--primary-border);">${escHtml(item.brand)}</span>`);
-            if (item.format) tags.push(`<span class="badge" style="background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);">${escHtml(item.format)}</span>`);
-            if (item.film_type) tags.push(`<span class="badge" style="background:rgba(251,191,36,0.15);color:#f59e0b;border:1px solid rgba(251,191,36,0.3);">${escHtml(item.film_type)}</span>`);
-            if (item.iso) tags.push(`<span class="badge" style="background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border);">ISO ${item.iso}</span>`);
-            if (item.expiry) tags.push(`<span class="badge" style="background:var(--bg-input);color:var(--text-muted);border:1px solid var(--border);">${escHtml(item.expiry)}</span>`);
-            let tagStr = tags.length ? '<div class="d-flex flex-wrap gap-1" style="font-size:0.72rem;">' + tags.join('') + '</div>' : '<span class="text-muted" style="font-size:0.8rem;">-</span>';
+            const matched = matchFilm(item);
+            item.film_id = matched ? matched.id : null;
+            let filmCell;
+            if (matched) {
+                filmCell = `<span class="badge" style="background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);font-size:0.8rem;">${escHtml(matched.brand)} ${escHtml(matched.model)}</span>`;
+            } else {
+                let opts = '<option value="">-- 选择胶片 --</option>';
+                allFilms.forEach(f => {
+                    opts += `<option value="${f.id}">${escHtml(f.brand)} ${escHtml(f.model)}</option>`;
+                });
+                filmCell = `<select class="form-select form-select-sm" style="width:auto;font-size:0.8rem;background:var(--bg-input);border:1px solid var(--danger-border);color:var(--danger);border-radius:6px;padding:0.2rem 0.5rem;" onchange="currentItems[${i}].film_id=this.value||null; this.style.borderColor=this.value?'var(--success-border)':'var(--danger-border)'; this.style.color=this.value?'var(--success)':'var(--danger)';">${opts}</select>`;
+            }
             html += `<tr>
                 <td style="white-space:nowrap">${escHtml(item.store)}</td>
-                <td style="max-width:260px;">${escHtml(item.title)}</td>
-                <td>${tagStr}</td>
+                <td style="max-width:220px;font-size:0.85rem;">${escHtml(item.title)}</td>
+                <td>${filmCell}</td>
                 <td class="text-danger fw-bold">¥${item.price}</td>
                 <td><button class="btn btn-sm btn-outline-danger" onclick="removeItem(${i})">删除</button></td>
             </tr>`;
@@ -199,7 +241,9 @@
                 saveStatus.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
                 return;
             }
-            saveStatus.innerHTML = `<div class="alert alert-success">成功保存 ${data.saved} 条价格记录</div>`;
+            let msg = `成功保存 ${data.saved} 条价格记录`;
+            if (data.skipped > 0) msg += `，${data.skipped} 条未匹配到胶片`;
+            saveStatus.innerHTML = `<div class="alert alert-success">${msg}</div>`;
             btnSave.style.display = 'none';
         } catch(e) {
             saveStatus.innerHTML = `<div class="alert alert-danger">保存失败: ${e.message}</div>`;

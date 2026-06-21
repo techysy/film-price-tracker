@@ -10,8 +10,13 @@
     </div>
     {% if films %}
     <div class="d-flex gap-2">
-        <a href="{{ url_for('main.export_html') }}" class="btn btn-sm btn-outline-primary">&#8681; 导出 HTML</a>
-        <a href="{{ url_for('main.export_json') }}" class="btn btn-sm btn-outline-primary">&#8681; 导出 JSON</a>
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" style="border-radius:8px; font-size:0.85rem;">&#8681; 导出</button>
+            <ul class="dropdown-menu dropdown-menu-end" style="border-radius:10px; border:1px solid var(--border); background:var(--bg-modal);">
+                <li><a class="dropdown-item" href="{{ url_for('main.export_html') }}" style="font-size:0.85rem;">导出 HTML</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('main.export_json') }}" style="font-size:0.85rem;">导出 JSON</a></li>
+            </ul>
+        </div>
     </div>
     {% endif %}
 </div>
