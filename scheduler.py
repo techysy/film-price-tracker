@@ -16,18 +16,6 @@ def run_spiders():
     logger.info("开始运行爬虫抓取价格数据...")
     try:
         result = subprocess.run(
-            ['scrapy', 'crawl', 'jd'],
-            cwd=app_config.SCRAPER_CWD,
-            capture_output=True,
-            text=True
-        )
-        logger.info(f"京东爬虫运行结果: {result.returncode}")
-        if result.stdout:
-            logger.info(f"标准输出: {result.stdout}")
-        if result.stderr:
-            logger.warning(f"标准错误: {result.stderr}")
-
-        result = subprocess.run(
             ['scrapy', 'crawl', 'taobao'],
             cwd=app_config.SCRAPER_CWD,
             capture_output=True,

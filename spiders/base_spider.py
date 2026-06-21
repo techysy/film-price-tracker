@@ -13,6 +13,10 @@ class BaseFilmSpider(scrapy.Spider):
             'lomography', '乐魔'
         ]
         self.film_formats = ['35mm', '120', '135']
+        self.instant_keywords = {
+            'instax': '拍立得', '拍立得': '拍立得',
+            'polaroid': '宝丽来', '宝丽来': '宝丽来',
+        }
         self.session = SessionLocal()
 
     def closed(self, reason):

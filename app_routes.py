@@ -1,6 +1,6 @@
 from datetime import datetime
-from flask import Blueprint, render_template, jsonify
-from models.film import SessionLocal, Film, PriceHistory
+from flask import Blueprint, render_template, jsonify, request, redirect, url_for, flash
+from models.film import SessionLocal, Film, PriceHistory, TaobaoStore
 
 main = Blueprint('main', __name__)
 
@@ -68,3 +68,80 @@ def api_price_history(film_id):
         return jsonify(data)
     finally:
         session.close()
+
+
+@main.route('/stores')
+def stores():
+    session = SessionLocal()
+    try:
+        store_list = session.query(TaobaoStore).order_by(TaobaoStore.created_at.desc()).all()
+        return render_template('stores.html', stores=store_list)
+    finally:
+        session.close()
+
+
+@main.route('/stores/add', methods=['POST'])
+def store_add():
+    name = request.form.get('name', '').strip()
+    url = request.form.get('url', '').strip()
+    if not name or not url:
+        flash('店铺名称和URL不能为空', 'danger')
+        return redirect(url_for('main.stores'))
+    session = SessionLocal()
+    try:
+        store = TaobaoStore(name=name, url=url)
+        session.add(store)
+        session.commit()
+        flash(f'店铺 "{name}" 添加成功', 'success')
+    except Exception as e:
+        session.rollback()
+        flash(f'添加失败: {e}', 'danger')
+    finally:
+        session.close()
+    return redirect(url_for('main.stores'))
+
+
+@main.route('/stores/edit/<int:store_id>', methods=['POST'])
+def store_edit(store_id):
+    session = SessionLocal()
+    try:
+        store = session.query(TaobaoStore).get(store_id)
+        if not store:
+            flash('店铺不存在', 'danger')
+            return redirect(url_for('main.stores'))
+        name = request.form.get('name', '').strip()
+        url = request.form.get('url', '').strip()
+        enabled = request.form.get('enabled') == 'on'
+        if name:
+            store.name = name
+        if url:
+            store.url = url
+        store.enabled = enabled
+        session.commit()
+        flash(f'店铺 "{store.name}" 已更新', 'success')
+    except Exception as e:
+        session.rollback()
+        flash(f'更新失败: {e}', 'danger')
+    finally:
+        session.close()
+    return redirect(url_for('main.stores'))
+
+
+@main.route('/stores/delete/<int:store_id>', methods=['POST'])
+def store_delete(store_id):
+    session = SessionLocal()
+    try:
+        store = session.query(TaobaoStore).get(store_id)
+        if not store:
+            flash('店铺不存在', 'danger')
+            return redirect(url_for('main.stores'))
+        name = store.name
+        session.delete(store)
+        session.commit()
+        flash(f'店铺 "{name}" 已删除', 'success')
+    except Exception as e:
+        session.rollback()
+        flash(f'删除失败: {e}', 'danger')
+    finally:
+        session.close()
+    return redirect(url_for('main.stores'))

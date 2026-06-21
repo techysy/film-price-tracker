@@ -3,35 +3,125 @@
 {% block title %}胶卷价格追踪{% endblock %}
 
 {% block content %}
-<div class="text-center mb-5">
-    <h1>胶卷价格追踪</h1>
+<div class="mb-5">
+    <h1 class="mb-2">胶卷价格追踪</h1>
     <p class="text-muted">实时监控各大平台胶卷价格，查看历史趋势</p>
 </div>
 
-<div class="row">
-    {% if films %}
-        {% for film in films %}
-        <div class="col-md-4 mb-4">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">{{ film.brand }} {{ film.model }}</h5>
-                    <p class="card-text">
-                        {% if film.iso %}ISO: {{ film.iso }}{% endif %}
-                        {% if film.format %} | 格式: {{ film.format }}{% endif %}
-                    </p>
-                    <a href="/film/{{ film.id }}" class="btn btn-primary">查看价格趋势</a>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    {% else %}
-        <div class="col-12">
-            <div class="card empty-state">
-                <div class="card-body">
-                    <p class="text-muted">暂无胶卷数据，请运行爬虫获取数据</p>
-                </div>
-            </div>
-        </div>
-    {% endif %}
+{% if films %}
+<div class="filter-bar mb-4">
+    <button class="filter-btn active" data-filter="all">全部</button>
+    <button class="filter-btn" data-filter="35mm">135 / 35mm</button>
+    <button class="filter-btn" data-filter="120">120</button>
+    <button class="filter-btn" data-filter="拍立得">拍立得</button>
+    <button class="filter-btn" data-filter="宝丽来">宝丽来</button>
+    <button class="filter-btn" data-filter="other">其他</button>
 </div>
+
+<div class="row" id="film-list">
+    {% for film in films %}
+    <div class="col-md-4 mb-4 film-item" data-format="{{ film.format or '' }}">
+        <a href="/film/{{ film.id }}" class="text-decoration-none" style="color: inherit;">
+            <div class="card film-card">
+                <div class="card-body">
+                    <h5 class="card-title" style="font-size: 1rem; gap: 0;">{{ film.brand }} {{ film.model }}</h5>
+                    <div class="film-meta">
+                        {% if film.iso %}<span>ISO {{ film.iso }}</span>{% endif %}
+                        {% if film.format %}<span>{{ film.format }}</span>{% endif %}
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="empty-filter" id="empty-filter" style="display: none;">
+    <div class="card">
+        <div class="card-body empty-state">
+            <div class="empty-icon">&#128269;</div>
+            <p>该分类下暂无胶卷</p>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body empty-state">
+        <div class="empty-icon">&#127909;</div>
+        <p>暂无胶卷数据，请运行爬虫获取数据</p>
+    </div>
+</div>
+{% endif %}
+
+<style>
+    .filter-bar {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .filter-btn {
+        padding: 0.4rem 1rem;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg-elevated);
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .filter-btn:hover {
+        border-color: var(--border-hover);
+        color: var(--text-heading);
+    }
+    .filter-btn.active {
+        background: var(--primary-soft);
+        border-color: var(--primary-border);
+        color: var(--accent);
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var btns = document.querySelectorAll('.filter-btn');
+    var items = document.querySelectorAll('.film-item');
+    var emptyFilter = document.getElementById('empty-filter');
+    var filmList = document.getElementById('film-list');
+    var exactFormats = ['35mm', '120', '拍立得', '宝丽来'];
+
+    btns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            btns.forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+
+            var f = btn.getAttribute('data-filter');
+            var visible = 0;
+
+            items.forEach(function(item) {
+                var fmt = item.getAttribute('data-format');
+                var show = false;
+
+                if (f === 'all') {
+                    show = true;
+                } else if (f === '35mm') {
+                    show = fmt === '35mm' || fmt === '135';
+                } else if (f === '120') {
+                    show = fmt === '120';
+                } else if (exactFormats.indexOf(f) !== -1) {
+                    show = fmt === f;
+                } else {
+                    show = fmt !== '35mm' && fmt !== '135' && fmt !== '120'
+                           && fmt !== '拍立得' && fmt !== '宝丽来' && fmt !== '';
+                }
+
+                item.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+
+            emptyFilter.style.display = visible === 0 ? '' : 'none';
+            filmList.style.display = visible === 0 ? 'none' : '';
+        });
+    });
+});
+</script>
 {% endblock %}

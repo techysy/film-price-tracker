@@ -8,17 +8,20 @@
 {% endblock %}
 
 {% block content %}
-<h1 class="text-center mb-4">{{ film.brand }} {{ film.model }}</h1>
+<a href="/" class="back-link">&larr; 返回首页</a>
+
+<h1 class="mt-3 mb-4">{{ film.brand }} {{ film.model }}</h1>
+
 <div class="row mb-4">
     <div class="col-md-6">
         <div class="card">
             <div class="card-body">
                 <h5 class="card-title">胶卷信息</h5>
-                <p class="card-text">
+                <div class="card-text" style="line-height: 2;">
                     {% if film.iso %}ISO: {{ film.iso }}{% endif %}<br>
                     {% if film.format %}格式: {{ film.format }}{% endif %}<br>
                     {% if film.description %}{{ film.description }}{% endif %}
-                </p>
+                </div>
             </div>
         </div>
     </div>
@@ -26,14 +29,20 @@
         <div class="card">
             <div class="card-body">
                 <h5 class="card-title">价格统计</h5>
-                <p class="card-text">
-                    {% if platforms %}
-                        监控平台: {{ platforms.keys()|join(', ') }}<br>
-                        数据点: {{ platforms.values()|map('length')|sum }}
-                    {% else %}
-                        暂无价格数据
-                    {% endif %}
-                </p>
+                {% if platforms %}
+                <div class="d-flex gap-4">
+                    <div>
+                        <div class="stat-big stat-accent">{{ platforms.keys()|list|length }}</div>
+                        <div class="stat-desc">监控店铺</div>
+                    </div>
+                    <div>
+                        <div class="stat-big stat-secondary">{{ platforms.values()|map('length')|sum }}</div>
+                        <div class="stat-desc">数据点</div>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted">暂无价格数据</p>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -42,17 +51,47 @@
 <div class="card">
     <div class="card-body">
         <h5 class="card-title">价格历史趋势</h5>
-        <div style="position: relative; height:400px;">
-            <canvas id="priceChart"></canvas>
+        <div class="chart-wrapper">
+            <div style="position: relative; height: 380px;">
+                <canvas id="priceChart"></canvas>
+            </div>
         </div>
     </div>
 </div>
 
+<style>
+    .back-link {
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 0.85rem;
+        transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--text-link); }
+    .stat-big {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-heading);
+    }
+    .stat-accent { color: var(--accent); }
+    .stat-secondary { color: var(--accent-secondary); }
+    .stat-desc {
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+</style>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        const root = document.documentElement;
+        const cs = getComputedStyle(root);
+
+        function cv(name) { return cs.getPropertyValue(name).trim(); }
+
         const ctx = document.getElementById('priceChart').getContext('2d');
         const datasets = [];
-        const colors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
+        const colors = ['#818cf8', '#22d3ee', '#34d399', '#fbbf24', '#f87171', '#a78bfa'];
         let colorIndex = 0;
 
         {% for platform, data in platforms.items() %}
@@ -60,38 +99,86 @@
                 label: '{{ platform }}',
                 data: {{ data|tojson }},
                 borderColor: colors[colorIndex % colors.length],
-                backgroundColor: colors[colorIndex % colors.length] + '20',
+                backgroundColor: colors[colorIndex % colors.length] + '15',
                 borderWidth: 2,
-                tension: 0.3,
-                pointRadius: 3
+                tension: 0.4,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                pointBackgroundColor: colors[colorIndex % colors.length],
+                pointBorderColor: cv('--bg'),
+                pointBorderWidth: 2,
+                fill: true
             });
             colorIndex++;
         {% endfor %}
 
-        new Chart(ctx, {
+        const chart = new Chart(ctx, {
             type: 'line',
             data: { datasets: datasets },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: { duration: 0 },
+                interaction: { mode: 'index', intersect: false },
                 scales: {
                     x: {
                         type: 'time',
                         time: { unit: 'day' },
-                        title: { display: true, text: '日期' }
+                        grid: { color: cv('--grid-line'), drawBorder: false },
+                        ticks: { color: cv('--text-dim'), font: { size: 11 } },
+                        title: { display: true, text: '日期', color: cv('--text-dim'), font: { size: 11, weight: 500 } }
                     },
                     y: {
                         beginAtZero: false,
-                        title: { display: true, text: '价格 (¥)' }
+                        grid: { color: cv('--grid-line'), drawBorder: false },
+                        ticks: { color: cv('--text-dim'), font: { size: 11 }, callback: function(v) { return '¥' + v; } },
+                        title: { display: true, text: '价格 (¥)', color: cv('--text-dim'), font: { size: 11, weight: 500 } }
                     }
                 },
                 plugins: {
-                    tooltip: { mode: 'index', intersect: false },
-                    legend: { position: 'top' },
-                    title: { display: true, text: '{{ film.brand }} {{ film.model }} 价格历史趋势' }
+                    tooltip: {
+                        backgroundColor: cv('--chart-tooltip-bg'),
+                        borderColor: cv('--chart-tooltip-border'),
+                        borderWidth: 1,
+                        titleColor: cv('--text-heading'),
+                        bodyColor: cv('--chart-tooltip-text'),
+                        padding: 12,
+                        cornerRadius: 10,
+                        titleFont: { weight: 600 },
+                        callbacks: { label: function(c) { return c.dataset.label + ': ¥' + c.parsed.y; } }
+                    },
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            color: cv('--text-dim'),
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            padding: 20,
+                            font: { size: 12 }
+                        }
+                    }
                 }
             }
         });
+
+        /* Re-render chart on theme change */
+        new MutationObserver(function() {
+            const cs = getComputedStyle(root);
+            function cv(n) { return cs.getPropertyValue(n).trim(); }
+            chart.options.scales.x.grid.color = cv('--grid-line');
+            chart.options.scales.x.ticks.color = cv('--text-dim');
+            chart.options.scales.x.title.color = cv('--text-dim');
+            chart.options.scales.y.grid.color = cv('--grid-line');
+            chart.options.scales.y.ticks.color = cv('--text-dim');
+            chart.options.scales.y.title.color = cv('--text-dim');
+            chart.options.plugins.tooltip.backgroundColor = cv('--chart-tooltip-bg');
+            chart.options.plugins.tooltip.borderColor = cv('--chart-tooltip-border');
+            chart.options.plugins.tooltip.titleColor = cv('--text-heading');
+            chart.options.plugins.tooltip.bodyColor = cv('--chart-tooltip-text');
+            chart.options.plugins.legend.labels.color = cv('--text-dim');
+            chart.data.datasets.forEach(function(ds) { ds.pointBorderColor = cv('--bg'); });
+            chart.update('none');
+        }).observe(root, { attributes: true, attributeFilter: ['data-resolved'] });
     });
 </script>
 {% endblock %}
