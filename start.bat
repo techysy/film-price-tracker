@@ -1,32 +1,42 @@
 @echo off
-chcp 65001 >nul
 cd /d "%~dp0"
 
-echo 启动胶卷价格追踪应用...
+echo.
+echo ========================================
+echo   Film Price Tracker
+echo ========================================
+echo.
 
-REM 检查虚拟环境
+echo [1/3] Virtual environment...
 if not exist "venv" (
-    echo 创建虚拟环境...
     python -m venv venv
+    echo   Created
+) else (
+    echo   Exists
 )
 
-REM 激活虚拟环境
 call venv\Scripts\activate.bat
 
-REM 安装依赖
-echo 安装依赖...
-pip install -r requirements.txt --quiet
+echo [2/3] Installing dependencies...
+pip install -r requirements.txt --quiet --disable-pip-version-check
+echo   Done
 
-REM 检查 OCR 引擎
-python -c "from rapidocr_onnxruntime import RapidOCR; print('  OCR 引擎就绪')" 2>nul
+echo [3/3] Checking OCR...
+python -c "from rapidocr_onnxruntime import RapidOCR"
 if errorlevel 1 (
-    echo 警告: OCR 引擎未安装，截图识别功能将不可用
+    echo   Not installed
+) else (
+    echo   Ready
 )
 
-REM 启动Flask应用
 echo.
-echo 启动 Flask 应用...
-echo 访问 http://127.0.0.1:5000
-echo 按 Ctrl+C 停止
+echo ========================================
+echo   http://127.0.0.1:5001
+echo   Press Ctrl+C to stop
+echo ========================================
 echo.
 python app.py
+
+echo.
+echo Stopped
+pause

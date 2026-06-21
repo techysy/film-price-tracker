@@ -1,6 +1,7 @@
 import io
 import re
 import base64
+import tempfile
 from datetime import datetime
 from pathlib import Path
 import json
@@ -312,12 +313,10 @@ def store_edit(store_id):
             return redirect(url_for('main.stores'))
         name = request.form.get('name', '').strip()
         url = request.form.get('url', '').strip()
-        enabled = request.form.get('enabled') == 'on'
         if name:
             store.name = name
         if url:
             store.url = url
-        store.enabled = enabled
         session.commit()
         flash(f'店铺 "{store.name}" 已更新', 'success')
     except Exception as e:
@@ -369,10 +368,11 @@ def api_ocr():
     try:
         image_bytes = base64.b64decode(image_data)
         img = Image.open(io.BytesIO(image_bytes))
-        img_path = Path('temp_upload.png')
-        img.save(img_path)
-        result, _ = ocr_engine(str(img_path))
-        img_path.unlink(missing_ok=True)
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+            img.save(tmp.name)
+            tmp_path = tmp.name
+        result, _ = ocr_engine(tmp_path)
+        Path(tmp_path).unlink(missing_ok=True)
     except Exception as e:
         return jsonify({'error': f'图片处理失败: {str(e)}'}), 400
 
