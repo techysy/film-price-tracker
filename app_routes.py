@@ -17,47 +17,113 @@ except ImportError:
 
 main = Blueprint('main', __name__)
 
-FILM_BRANDS = [
-    'kodak', '柯达', 'fujifilm', '富士', 'ilford', '伊尔福',
-    'agfa', '爱克发', 'lomography', '乐魔'
-]
-FILM_FORMATS = ['35mm', '120', '135']
-INSTANT_KEYWORDS = {'instax': '拍立得', '拍立得': '拍立得', 'polaroid': '宝丽来', '宝丽来': '宝丽来'}
+FILM_BRANDS = {
+    'kodak': '柯达', '柯达': '柯达',
+    'fujifilm': '富士', '富士': '富士', 'fuji': '富士',
+    'ilford': '伊尔福', '伊尔福': '伊尔福',
+    'agfa': '爱克发', '爱克发': '爱克发',
+    'lomography': '乐魔', '乐魔': '乐魔',
+    'cinestill': 'Cinestill', 'fomapan': 'Fomapan',
+    'wolfen': 'Wolfen', 'orwo': 'ORWO',
+    'flic': 'Flic Film', 'chrome': '反转',
+}
+INSTANT_FORMATS = {
+    'instax mini': '拍立得Mini', 'mini': '拍立得Mini',
+    'instax sq': '拍立得SQ', 'sq': '拍立得SQ',
+    'instax wide': '拍立得Wide', 'wide': '拍立得Wide',
+    'instax': '拍立得',
+    'polaroid': '宝丽来', '宝丽来': '宝丽来',
+    'igo': '宝丽来',
+}
+FILM_TYPES = {
+    '彩负': '彩负', '彩色负片': '彩负', 'color': '彩负', 'colorplus': '彩负',
+    'gold': '彩负', 'ultra': '彩负', 'max': '彩负',
+    '黑白': '黑白', 'b&w': '黑白', 'bw': '黑白', 'pan': '黑白',
+    'hp5': '黑白', 'delta': '黑白', 'fomapan': '黑白',
+    '反转': '反转', 'slide': '反转', 'reversal': '反转',
+    'chrome': '反转', 'provia': '反转', 'velvia': '反转', 'ektar': '反转',
+    '彩负电影卷': '电影卷', '电影卷': '电影卷', 'vision': '电影卷', '5207': '电影卷', '5219': '电影卷',
+    '黑白电影卷': '黑白电影卷',
+    '一次成像': '一次成像', '拍立得': '一次成像', '宝丽来': '一次成像',
+    'phoenix': '彩负',
+}
 UNKNOWN_BRAND = '其他'
 
 
 def parse_product_name(name):
+    name_lower = name.lower()
     brand = None
     model = name
     iso = None
     film_format = None
+    film_type = None
+    expiry = None
 
-    for b in FILM_BRANDS:
-        if b in name:
-            brand = b
-            model = name.replace(b, '').strip()
+    for key, val in FILM_BRANDS.items():
+        if key in name_lower:
+            brand = val
             break
 
-    iso_match = re.search(r'ISO(\d+)', name, re.IGNORECASE)
+    iso_match = re.search(r'ISO[\s]*(\d+)', name, re.IGNORECASE)
     if not iso_match:
         iso_match = re.search(r'(\d+)度', name)
+    if not iso_match:
+        iso_match = re.search(r'(?:金|GOLD|Max|Ultra|Plus|Color|CP|Pan|HP|Delta|Provia|Velvia|Ektar|Cine|Still)[\s]*(\d{3,4})', name, re.IGNORECASE)
+    if not iso_match:
+        iso_match = re.search(r'(\d{3,4})\s*(?:T|F|C|D|Plus|Pro)[\b\s]', name, re.IGNORECASE)
+    if not iso_match:
+        iso_match = re.search(r'(\d{3,4})(?:\s*(?:张| exposures?| exp))', name, re.IGNORECASE)
     if iso_match:
-        iso = int(iso_match.group(1))
+        iso_val = int(iso_match.group(1))
+        if 25 <= iso_val <= 6400:
+            iso = iso_val
 
-    for fmt in FILM_FORMATS:
-        if fmt in name:
+    for kw, fmt in sorted(INSTANT_FORMATS.items(), key=lambda x: -len(x[0])):
+        if kw in name_lower:
             film_format = fmt
             break
-    if '135' in name:
-        film_format = '35mm'
-
     if not film_format:
-        for kw, fmt in INSTANT_KEYWORDS.items():
-            if kw in name:
-                film_format = fmt
+        if '135' in name or '35mm' in name_lower:
+            film_format = '35mm'
+        elif '120' in name:
+            film_format = '120'
+        elif '220' in name:
+            film_format = '220'
+        elif '4x5' in name or '4x4' in name:
+            film_format = '大画幅'
+        elif '5x7' in name or '8x10' in name:
+            film_format = '大画幅'
+
+    if film_format and '拍立得' in film_format or '宝丽来' in film_format:
+        if '黑白' in name or 'b&w' in name_lower:
+            film_type = '黑白一次成像'
+        elif '彩色' in name or 'color' in name_lower:
+            film_type = '彩色一次成像'
+        else:
+            film_type = '一次成像'
+    else:
+        for kw, ft in sorted(FILM_TYPES.items(), key=lambda x: -len(x[0])):
+            if kw in name_lower:
+                film_type = ft
                 break
 
-    return brand or UNKNOWN_BRAND, model, iso, film_format
+    exp_match = re.search(r'(\d{2})[年.\-/](\d{1,2})[月]?', name)
+    if exp_match:
+        y = int(exp_match.group(1))
+        m = int(exp_match.group(2))
+        if 20 <= y <= 35:
+            y += 2000
+        if 1 <= m <= 12:
+            expiry = f'{y}-{m:02d}'
+
+    return {
+        'brand': brand or UNKNOWN_BRAND,
+        'model': name[:100],
+        'iso': iso,
+        'format': film_format,
+        'film_type': film_type,
+        'expiry': expiry,
+    }
 
 
 def parse_ocr_lines(ocr_result):
@@ -377,6 +443,13 @@ def api_ocr():
         return jsonify({'error': f'图片处理失败: {str(e)}'}), 400
 
     items = parse_ocr_lines(result)
+    for item in items:
+        info = parse_product_name(item.get('title', ''))
+        item['brand'] = info['brand']
+        item['format'] = info['format']
+        item['film_type'] = info['film_type']
+        item['iso'] = info['iso']
+        item['expiry'] = info['expiry']
     return jsonify({'items': items, 'raw_lines': [item[1] for item in (result or []) if item]})
 
 
@@ -399,11 +472,18 @@ def api_save():
             if not title or price <= 0:
                 continue
 
-            brand, model, iso, film_format = parse_product_name(title)
+            info = parse_product_name(title)
+            brand = info['brand']
+            model = info['model']
+            iso = info['iso']
+            film_format = info['format']
+            film_type = info['film_type']
+            expiry = info['expiry']
 
             film = session.query(Film).filter_by(brand=brand, model=model).first()
             if not film:
-                film = Film(brand=brand, model=title[:100], iso=iso, format=film_format)
+                film = Film(brand=brand, model=title[:100], iso=iso, format=film_format,
+                            film_type=film_type, expiry=expiry)
                 session.add(film)
                 session.commit()
 

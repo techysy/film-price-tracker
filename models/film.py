@@ -19,6 +19,8 @@ class Film(Base):
     model = Column(String(100), nullable=False)
     iso = Column(Integer)
     format = Column(String(20))
+    film_type = Column(String(30))
+    expiry = Column(String(10))
     description = Column(String(255))
 
     price_histories = relationship('PriceHistory', back_populates='film')

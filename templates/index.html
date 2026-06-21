@@ -17,25 +17,46 @@
 </div>
 
 {% if films %}
-<div class="filter-bar mb-4">
-    <button class="filter-btn active" data-filter="all">全部</button>
-    <button class="filter-btn" data-filter="35mm">135 / 35mm</button>
-    <button class="filter-btn" data-filter="120">120</button>
-    <button class="filter-btn" data-filter="拍立得">拍立得</button>
-    <button class="filter-btn" data-filter="宝丽来">宝丽来</button>
-    <button class="filter-btn" data-filter="other">其他</button>
+<div class="filter-section mb-3">
+    <div class="filter-label">画幅</div>
+    <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all" data-group="format">全部</button>
+        <button class="filter-btn" data-filter="35mm" data-group="format">135 / 35mm</button>
+        <button class="filter-btn" data-filter="120" data-group="format">120</button>
+        <button class="filter-btn" data-filter="拍立得" data-group="format">拍立得</button>
+        <button class="filter-btn" data-filter="宝丽来" data-group="format">宝丽来</button>
+        <button class="filter-btn" data-filter="other" data-group="format">其他</button>
+    </div>
+</div>
+<div class="filter-section mb-4">
+    <div class="filter-label">类型</div>
+    <div class="filter-bar">
+        <button class="filter-btn type-btn active" data-filter="all" data-group="type">全部</button>
+        <button class="filter-btn type-btn" data-filter="彩负" data-group="type">彩负</button>
+        <button class="filter-btn type-btn" data-filter="黑白" data-group="type">黑白</button>
+        <button class="filter-btn type-btn" data-filter="反转" data-group="type">反转</button>
+        <button class="filter-btn type-btn" data-filter="电影卷" data-group="type">电影卷</button>
+        <button class="filter-btn type-btn" data-filter="一次成像" data-group="type">一次成像</button>
+    </div>
 </div>
 
 <div class="row" id="film-list">
     {% for film in films %}
-    <div class="col-md-4 mb-4 film-item" data-format="{{ film.format or '' }}">
+    <div class="col-md-4 mb-4 film-item"
+         data-format="{{ film.format or '' }}"
+         data-type="{{ film.film_type or '' }}"
+         data-brand="{{ film.brand or '' }}">
         <a href="/film/{{ film.id }}" class="text-decoration-none" style="color: inherit;">
             <div class="card film-card">
                 <div class="card-body">
-                    <h5 class="card-title" style="font-size: 1rem; gap: 0;">{{ film.brand }} {{ film.model }}</h5>
+                    <div class="d-flex justify-content-between align-items-start">
+                        <h5 class="card-title" style="font-size: 1rem; gap: 0;">{{ film.brand }} {{ film.model }}</h5>
+                    </div>
                     <div class="film-meta">
-                        {% if film.iso %}<span>ISO {{ film.iso }}</span>{% endif %}
                         {% if film.format %}<span>{{ film.format }}</span>{% endif %}
+                        {% if film.film_type %}<span>{{ film.film_type }}</span>{% endif %}
+                        {% if film.iso %}<span>ISO {{ film.iso }}</span>{% endif %}
+                        {% if film.expiry %}<span>效期 {{ film.expiry }}</span>{% endif %}
                     </div>
                 </div>
             </div>
@@ -63,18 +84,29 @@
 {% endif %}
 
 <style>
+    .filter-section {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .filter-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        font-weight: 500;
+        min-width: 32px;
+    }
     .filter-bar {
         display: flex;
-        gap: 0.5rem;
+        gap: 0.4rem;
         flex-wrap: wrap;
     }
     .filter-btn {
-        padding: 0.4rem 1rem;
+        padding: 0.35rem 0.85rem;
         border-radius: 8px;
         border: 1px solid var(--border);
         background: var(--bg-elevated);
         color: var(--text-secondary);
-        font-size: 0.85rem;
+        font-size: 0.8rem;
         font-weight: 500;
         cursor: pointer;
         transition: all 0.2s;
@@ -92,43 +124,50 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    var btns = document.querySelectorAll('.filter-btn');
+    var formatBtns = document.querySelectorAll('.filter-btn[data-group="format"]');
+    var typeBtns = document.querySelectorAll('.filter-btn[data-group="type"]');
     var items = document.querySelectorAll('.film-item');
     var emptyFilter = document.getElementById('empty-filter');
     var filmList = document.getElementById('film-list');
-    var exactFormats = ['35mm', '120', '拍立得', '宝丽来'];
 
-    btns.forEach(function(btn) {
+    var activeFormat = 'all';
+    var activeType = 'all';
+
+    function applyFilters() {
+        var visible = 0;
+        items.forEach(function(item) {
+            var fmt = item.getAttribute('data-format');
+            var tp = item.getAttribute('data-type');
+            var showFmt = activeFormat === 'all' || fmt === activeFormat ||
+                (activeFormat === '35mm' && (fmt === '35mm' || fmt === '135')) ||
+                (activeFormat === '拍立得' && fmt && fmt.indexOf('拍立得') !== -1) ||
+                (activeFormat === '宝丽来' && fmt && fmt.indexOf('宝丽来') !== -1) ||
+                (activeFormat === 'other' && fmt !== '35mm' && fmt !== '135' && fmt !== '120'
+                 && (!fmt || (fmt.indexOf('拍立得') === -1 && fmt.indexOf('宝丽来') === -1)));
+            var showType = activeType === 'all' || (tp && tp.indexOf(activeType) !== -1);
+            var show = showFmt && showType;
+            item.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+        emptyFilter.style.display = visible === 0 ? '' : 'none';
+        filmList.style.display = visible === 0 ? 'none' : '';
+    }
+
+    formatBtns.forEach(function(btn) {
         btn.addEventListener('click', function() {
-            btns.forEach(function(b) { b.classList.remove('active'); });
+            formatBtns.forEach(function(b) { b.classList.remove('active'); });
             btn.classList.add('active');
+            activeFormat = btn.getAttribute('data-filter');
+            applyFilters();
+        });
+    });
 
-            var f = btn.getAttribute('data-filter');
-            var visible = 0;
-
-            items.forEach(function(item) {
-                var fmt = item.getAttribute('data-format');
-                var show = false;
-
-                if (f === 'all') {
-                    show = true;
-                } else if (f === '35mm') {
-                    show = fmt === '35mm' || fmt === '135';
-                } else if (f === '120') {
-                    show = fmt === '120';
-                } else if (exactFormats.indexOf(f) !== -1) {
-                    show = fmt === f;
-                } else {
-                    show = fmt !== '35mm' && fmt !== '135' && fmt !== '120'
-                           && fmt !== '拍立得' && fmt !== '宝丽来' && fmt !== '';
-                }
-
-                item.style.display = show ? '' : 'none';
-                if (show) visible++;
-            });
-
-            emptyFilter.style.display = visible === 0 ? '' : 'none';
-            filmList.style.display = visible === 0 ? 'none' : '';
+    typeBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            typeBtns.forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            activeType = btn.getAttribute('data-filter');
+            applyFilters();
         });
     });
 });

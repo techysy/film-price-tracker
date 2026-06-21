@@ -152,11 +152,19 @@
     });
 
     function renderItems(items) {
-        let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr><th>店铺</th><th>商品</th><th>价格</th><th></th></tr></thead><tbody>';
+        let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr><th>店铺</th><th>商品</th><th>解析</th><th>价格</th><th></th></tr></thead><tbody>';
         items.forEach((item, i) => {
+            let tags = [];
+            if (item.brand && item.brand !== '其他') tags.push(`<span class="badge" style="background:var(--primary-soft);color:var(--accent);border:1px solid var(--primary-border);">${escHtml(item.brand)}</span>`);
+            if (item.format) tags.push(`<span class="badge" style="background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);">${escHtml(item.format)}</span>`);
+            if (item.film_type) tags.push(`<span class="badge" style="background:rgba(251,191,36,0.15);color:#f59e0b;border:1px solid rgba(251,191,36,0.3);">${escHtml(item.film_type)}</span>`);
+            if (item.iso) tags.push(`<span class="badge" style="background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border);">ISO ${item.iso}</span>`);
+            if (item.expiry) tags.push(`<span class="badge" style="background:var(--bg-input);color:var(--text-muted);border:1px solid var(--border);">${escHtml(item.expiry)}</span>`);
+            let tagStr = tags.length ? '<div class="d-flex flex-wrap gap-1" style="font-size:0.72rem;">' + tags.join('') + '</div>' : '<span class="text-muted" style="font-size:0.8rem;">-</span>';
             html += `<tr>
                 <td style="white-space:nowrap">${escHtml(item.store)}</td>
-                <td>${escHtml(item.title)}</td>
+                <td style="max-width:260px;">${escHtml(item.title)}</td>
+                <td>${tagStr}</td>
                 <td class="text-danger fw-bold">¥${item.price}</td>
                 <td><button class="btn btn-sm btn-outline-danger" onclick="removeItem(${i})">删除</button></td>
             </tr>`;
