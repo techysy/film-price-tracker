@@ -1,21 +1,15 @@
 # 核心依赖
 # Python 3.8+
 
-# 爬虫相关
-scrapy==2.11.2
-requests==2.31.0
-beautifulsoup4==4.12.3
-lxml==5.2.1
-
 # 数据存储
 SQLAlchemy==2.0.25
 
 # 前端和Web服务
 Flask==3.0.2
-Flask-SQLAlchemy==3.1.1
+Pillow>=10.0.0
 
-# 定时任务
-APScheduler==3.10.4
+# OCR 识别
+rapidocr-onnxruntime>=1.2.0
 
 # 其他
 python-dotenv==1.0.0

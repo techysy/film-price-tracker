@@ -56,7 +56,7 @@
                 <tbody>
                     {% for store in stores %}
                     <tr>
-                        <td style="font-weight: 500; color: #fff;">{{ store.name }}</td>
+                        <td style="font-weight: 500; color: var(--text-heading);">{{ store.name }}</td>
                         <td><a href="{{ store.url }}" target="_blank" class="text-truncate d-inline-block" style="max-width: 280px; font-size: 0.8rem;">{{ store.url }}</a></td>
                         <td>
                             {% if store.enabled %}
@@ -65,7 +65,7 @@
                                 <span class="badge bg-secondary">禁用</span>
                             {% endif %}
                         </td>
-                        <td style="font-size: 0.8rem; color: rgba(255,255,255,0.35);">{{ store.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td style="font-size: 0.8rem; color: var(--text-muted);">{{ store.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                         <td style="text-align: right;">
                             <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ store.id }}">编辑</button>
                             <form method="POST" action="{{ url_for('main.store_delete', store_id=store.id) }}" class="d-inline" onsubmit="return confirm('确定删除店铺 {{ store.name }}？')">
@@ -97,7 +97,7 @@
                                         </div>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5);">取消</button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="background: var(--bg-elevated); color: var(--text-secondary); border: 1px solid var(--border);">取消</button>
                                         <button type="submit" class="btn btn-primary">保存</button>
                                     </div>
                                 </form>

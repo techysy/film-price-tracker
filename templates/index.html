@@ -3,9 +3,17 @@
 {% block title %}胶卷价格追踪{% endblock %}
 
 {% block content %}
-<div class="mb-5">
-    <h1 class="mb-2">胶卷价格追踪</h1>
-    <p class="text-muted">实时监控各大平台胶卷价格，查看历史趋势</p>
+<div class="d-flex justify-content-between align-items-start mb-5">
+    <div>
+        <h1 class="mb-2">胶卷价格追踪</h1>
+        <p class="text-muted">实时监控各大平台胶卷价格，查看历史趋势</p>
+    </div>
+    {% if films %}
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('main.export_html') }}" class="btn btn-sm btn-outline-primary">&#8681; 导出 HTML</a>
+        <a href="{{ url_for('main.export_json') }}" class="btn btn-sm btn-outline-primary">&#8681; 导出 JSON</a>
+    </div>
+    {% endif %}
 </div>
 
 {% if films %}

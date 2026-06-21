@@ -8,7 +8,13 @@
 {% endblock %}
 
 {% block content %}
-<a href="/" class="back-link">&larr; 返回首页</a>
+<div class="d-flex justify-content-between align-items-center mb-1">
+    <a href="/" class="back-link">&larr; 返回首页</a>
+    <div class="export-group">
+        <a href="{{ url_for('main.export_html') }}" class="btn btn-sm btn-outline-primary">&#8681; 导出全部 HTML</a>
+        <a href="{{ url_for('main.export_json') }}" class="btn btn-sm btn-outline-primary">&#8681; 导出全部 JSON</a>
+    </div>
+</div>
 
 <h1 class="mt-3 mb-4">{{ film.brand }} {{ film.model }}</h1>
 
@@ -67,6 +73,14 @@
         transition: color 0.2s;
     }
     .back-link:hover { color: var(--text-link); }
+    .export-group {
+        display: flex;
+        gap: 0.4rem;
+    }
+    .export-group .btn {
+        font-size: 0.78rem;
+        padding: 0.3rem 0.75rem;
+    }
     .stat-big {
         font-size: 1.5rem;
         font-weight: 700;
@@ -84,15 +98,13 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const root = document.documentElement;
-        const cs = getComputedStyle(root);
+        var root = document.documentElement;
+        function cv(name) { return getComputedStyle(root).getPropertyValue(name).trim(); }
 
-        function cv(name) { return cs.getPropertyValue(name).trim(); }
-
-        const ctx = document.getElementById('priceChart').getContext('2d');
-        const datasets = [];
-        const colors = ['#818cf8', '#22d3ee', '#34d399', '#fbbf24', '#f87171', '#a78bfa'];
-        let colorIndex = 0;
+        var ctx = document.getElementById('priceChart').getContext('2d');
+        var datasets = [];
+        var colors = ['#818cf8', '#22d3ee', '#34d399', '#fbbf24', '#f87171', '#a78bfa'];
+        var colorIndex = 0;
 
         {% for platform, data in platforms.items() %}
             datasets.push({
@@ -112,7 +124,7 @@
             colorIndex++;
         {% endfor %}
 
-        const chart = new Chart(ctx, {
+        var chart = new Chart(ctx, {
             type: 'line',
             data: { datasets: datasets },
             options: {
@@ -150,7 +162,7 @@
                     legend: {
                         position: 'top',
                         labels: {
-                            color: cv('--text-dim'),
+                            color: cv('--text-secondary'),
                             usePointStyle: true,
                             pointStyle: 'circle',
                             padding: 20,
@@ -161,10 +173,7 @@
             }
         });
 
-        /* Re-render chart on theme change */
-        new MutationObserver(function() {
-            const cs = getComputedStyle(root);
-            function cv(n) { return cs.getPropertyValue(n).trim(); }
+        function updateChart() {
             chart.options.scales.x.grid.color = cv('--grid-line');
             chart.options.scales.x.ticks.color = cv('--text-dim');
             chart.options.scales.x.title.color = cv('--text-dim');
@@ -175,10 +184,12 @@
             chart.options.plugins.tooltip.borderColor = cv('--chart-tooltip-border');
             chart.options.plugins.tooltip.titleColor = cv('--text-heading');
             chart.options.plugins.tooltip.bodyColor = cv('--chart-tooltip-text');
-            chart.options.plugins.legend.labels.color = cv('--text-dim');
+            chart.options.plugins.legend.labels.color = cv('--text-secondary');
             chart.data.datasets.forEach(function(ds) { ds.pointBorderColor = cv('--bg'); });
             chart.update('none');
-        }).observe(root, { attributes: true, attributeFilter: ['data-resolved'] });
+        }
+
+        new MutationObserver(updateChart).observe(root, { attributes: true, attributeFilter: ['data-resolved'] });
     });
 </script>
 {% endblock %}

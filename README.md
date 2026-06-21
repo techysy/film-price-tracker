@@ -1,14 +1,16 @@
 # 胶卷价格追踪应用
 
-实时监控淘宝店铺胶卷价格，通过 Web 界面查看历史趋势。支持深色/浅色/跟随系统主题切换，按画幅分类筛选胶卷。
+基于 OCR 截图识别的胶卷价格追踪工具。粘贴或上传淘宝购物车截图，自动识别商品名称和价格，保存到数据库并展示趋势图表。
+
+支持深色/浅色/跟随系统主题切换，按画幅分类筛选胶卷。
 
 ## 技术栈
 
 - Python 3.8+
 - Flask — Web 框架
-- Scrapy — 爬虫框架
 - SQLAlchemy — ORM，SQLite 持久化
-- APScheduler — 定时任务
+- RapidOCR (ONNX Runtime) — 图片文字识别
+- Pillow — 图片处理
 - Bootstrap 5 + Chart.js — 前端
 
 ## 快速开始
@@ -16,26 +18,48 @@
 ### 安装依赖
 
 ```powershell
+# 建议使用虚拟环境
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+
 pip install -r requirements.txt
 ```
 
 ### 启动应用
 
 ```powershell
-# 启动定时任务（后台）
-python scheduler.py &
-
-# 启动 Web 服务
 python app.py
 ```
 
-浏览器访问 `http://localhost:5001`
+浏览器访问 `http://127.0.0.1:5000`
 
-### 手动运行爬虫
+或使用启动脚本（自动创建虚拟环境、安装依赖）：
 
 ```powershell
-scrapy crawl taobao
+.\start.ps1    # PowerShell
+start.bat      # CMD
 ```
+
+## 使用方法
+
+### 截图识别
+
+1. 在淘宝购物车页面截图（或复制截图到剪贴板）
+2. 点击导航栏「截图识别」
+3. 粘贴 (Ctrl+V)、拖拽或点击上传截图
+4. 点击「开始识别」，系统自动提取商品名称和价格
+5. 确认无误后点击「确认保存」，数据写入数据库
+
+### 店铺管理
+
+访问 `/stores` 管理淘宝店铺列表（仅作为记录参考，不涉及自动抓取）。
+
+### 导出
+
+首页或详情页点击导出按钮：
+
+- **JSON** — 结构化数据，包含胶卷信息和价格记录
+- **HTML** — 自包含单文件，内联 CSS + Chart.js，可部署到 GitHub Pages
 
 ## 项目结构
 
@@ -43,26 +67,23 @@ scrapy crawl taobao
 film-price-tracker/
 ├── app.py                  # Flask 入口
 ├── app_factory.py          # Flask 工厂
-├── app_routes.py           # 路由（首页/详情/店铺管理）
+├── app_routes.py           # 路由（首页/详情/店铺管理/截图OCR）
 ├── config.py               # 配置（DB URI, Secret Key）
-├── scheduler.py            # APScheduler 定时任务
-├── scrapy.cfg              # Scrapy 配置
 ├── requirements.txt        # Python 依赖
+├── start.ps1               # PowerShell 启动脚本
+├── start.bat               # CMD 启动脚本
 │
 ├── models/
 │   ├── __init__.py
 │   └── film.py             # ORM 模型：Film, PriceHistory, TaobaoStore
 │
-├── spiders/
-│   ├── __init__.py
-│   ├── base_spider.py      # 爬虫基类（品牌识别、DB 写入）
-│   └── taobao_spider.py    # 淘宝店铺爬虫（从 DB 读取店铺列表）
-│
 ├── templates/
 │   ├── base.html           # 布局模板（导航栏、主题切换）
-│   ├── index.html          # 首页（胶卷列表、分类过滤）
+│   ├── index.html          # 首页（胶卷列表、分类过滤、导出按钮）
 │   ├── film_detail.html    # 详情页（价格趋势图表）
-│   └── stores.html         # 店铺管理（增删改查）
+│   ├── export.html         # 导出模板（自包含单文件 HTML）
+│   ├── stores.html         # 店铺管理（增删改查）
+│   └── upload.html         # 截图识别（粘贴/拖拽/上传）
 │
 └── static/css/style.css    # 全局样式（深色/浅色双主题）
 ```
@@ -75,9 +96,7 @@ SQLite 数据库 `film_prices.db`，包含三张表：
 |---|---|---|
 | `films` | id, brand, model, iso, format, description | 胶卷信息 |
 | `price_histories` | id, film_id(FK), platform, price, url, timestamp | 价格记录 |
-| `taobao_stores` | id, name, url, enabled, created_at | 淘宝店铺配置 |
-
-`platform` 字段存储店铺名称，与 `taobao_stores.name` 对应。
+| `taobao_stores` | id, name, url, enabled, created_at | 淘宝店铺记录 |
 
 ## 功能
 
@@ -85,7 +104,7 @@ SQLite 数据库 `film_prices.db`，包含三张表：
 
 - 胶卷卡片列表，点击进入详情
 - 分类过滤：全部 / 135(35mm) / 120 / 拍立得 / 宝丽来 / 其他
-- 即时过滤，无需请求服务器
+- 批量导出所有胶卷数据（JSON / HTML）
 
 ### 详情页
 
@@ -94,11 +113,24 @@ SQLite 数据库 `film_prices.db`，包含三张表：
 - Chart.js 折线图展示各店铺价格历史趋势
 - 图表随主题切换实时更新
 
+### 截图识别 `/upload`
+
+- 支持 Ctrl+V 粘贴截图
+- 支持拖拽上传图片
+- 支持点击选择文件
+- OCR 识别后展示商品列表，可逐条删除
+- 识别结果保存到 films + price_histories
+
 ### 店铺管理 `/stores`
 
 - 添加淘宝店铺（名称 + 店铺主页 URL）
-- 编辑店铺信息、启用/禁用爬取
+- 编辑店铺信息、启用/禁用
 - 删除店铺
+
+### 导出
+
+- **JSON** — `/export/json`，结构化数据
+- **HTML** — `/export/html`，自包含文件，内联 CSS 变量 + 主题切换 JS
 
 ### 主题切换
 
@@ -110,10 +142,6 @@ SQLite 数据库 `film_prices.db`，包含三张表：
 
 偏好保存在 localStorage，页面加载无闪烁。
 
-### 定时任务
-
-每天凌晨 2:00 自动运行 `scrapy crawl taobao`，抓取所有启用店铺的胶卷商品价格。
-
 ## 路由
 
 | 路由 | 方法 | 说明 |
@@ -124,20 +152,27 @@ SQLite 数据库 `film_prices.db`，包含三张表：
 | `/stores/add` | POST | 添加店铺 |
 | `/stores/edit/<id>` | POST | 编辑店铺 |
 | `/stores/delete/<id>` | POST | 删除店铺 |
+| `/upload` | GET | 截图识别页面 |
+| `/api/ocr` | POST | OCR 识别接口（base64 图片） |
+| `/api/save` | POST | 保存识别结果 |
 | `/api/price_history/<film_id>` | GET | 价格历史 JSON API |
+| `/export/json` | GET | 导出全部数据 JSON |
+| `/export/html` | GET | 导出全部数据 HTML |
 
-## 爬虫
+## OCR 说明
 
-### 淘宝爬虫 `taobao`
+使用 [RapidOCR](https://github.com/RapidAI/RapidOCR) (ONNX Runtime) 进行文字识别，无需安装 Tesseract。
 
-- 从 `taobao_stores` 表读取所有 `enabled=True` 的店铺
-- 逐店爬取商品页面，识别胶卷品牌和型号
-- 支持分页
-- 自动识别：品牌、ISO、画幅（35mm / 120 / 拍立得 / 宝丽来）
+支持的截图格式：
+- 淘宝购物车截图（单店铺 / 多店铺混排）
+- 淘宝商品详情截图
+- 淘宝订单截图
 
-### 支持的品牌
+识别流程：截图 → OCR 提取文字 → 正则匹配价格 → 关键词匹配胶卷品牌 → 保存到数据库
 
-kodak/柯达, fujifilm/富士, ilford/伊尔福, agfa/爱克发, lomography/乐魔
+### 支持识别的胶卷品牌
+
+Kodak/柯达, Fujifilm/富士, Ilford/伊尔福, Agfa/爱克发, Lomography/乐魔, ORWO, Cinestill, Fomapan, Ilford HP5, Ilford Delta, Wolfen, Flic Film 等
 
 ### 识别的画幅关键词
 
