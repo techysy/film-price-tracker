@@ -61,7 +61,7 @@ h1{color:var(--txh);font-weight:700;font-size:1.8rem;letter-spacing:-.03em;margi
 
 <div class="container">
     <h1>胶卷价格趋势</h1>
-    <div class="subtitle">共 {{ all_data|length }} 款胶卷 &middot; 导出于 {{ now.strftime('%Y-%m-%d') }}</div>
+    <div class="subtitle">共 {{ all_data|length }} 款胶卷 &middot; 导出于 {{ now.strftime('%Y.%m.%d') }}</div>
 
     {% for item in all_data %}
     {% set film = item.film %}
@@ -154,11 +154,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 animation:{duration:0},
                 interaction:{mode:'index',intersect:false},
                 scales:{
-                    x:{type:'time',time:{unit:'day'},grid:{color:cv('--gl'),drawBorder:false},ticks:{color:cv('--txd'),font:{size:11}},title:{display:true,text:'日期',color:cv('--txd'),font:{size:11,weight:500}}},
+                    x:{type:'time',time:{unit:'day',displayFormats:{day:'yyyy.MM.dd'},tooltipFormat:'yyyy.MM.dd'},grid:{color:cv('--gl'),drawBorder:false},ticks:{color:cv('--txd'),font:{size:11},callback:function(v){var d=new Date(v);return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')}},title:{display:true,text:'日期',color:cv('--txd'),font:{size:11,weight:500}}},
                     y:{beginAtZero:false,grid:{color:cv('--gl'),drawBorder:false},ticks:{color:cv('--txd'),font:{size:11},callback:function(v){return'¥'+v}},title:{display:true,text:'价格 (¥)',color:cv('--txd'),font:{size:11,weight:500}}}
                 },
                 plugins:{
-                    tooltip:{backgroundColor:cv('--ttbg'),borderColor:cv('--ttbd'),borderWidth:1,titleColor:cv('--txh'),bodyColor:cv('--tttx'),padding:12,cornerRadius:10,titleFont:{weight:600},callbacks:{label:function(c){return c.dataset.label+': ¥'+c.parsed.y}}},
+                    tooltip:{backgroundColor:cv('--ttbg'),borderColor:cv('--ttbd'),borderWidth:1,titleColor:cv('--txh'),bodyColor:cv('--tttx'),padding:12,cornerRadius:10,titleFont:{weight:600},callbacks:{title:function(items){if(items.length){var d=new Date(items[0].parsed.x);return d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')}return''},label:function(c){return c.dataset.label+': ¥'+c.parsed.y}}},
                     legend:{position:'top',labels:{color:cv('--txs'),usePointStyle:true,pointStyle:'circle',padding:20,font:{size:12}}}
                 }
             }

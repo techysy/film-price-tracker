@@ -35,8 +35,8 @@ class PriceHistory(Base):
     platform = Column(String(50), nullable=False)
     price = Column(Float, nullable=False)
     url = Column(String(255))
+    rolls_per_pack = Column(Integer, default=1)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
-
     film = relationship('Film', back_populates='price_histories')
 
 
@@ -74,6 +74,7 @@ def init_db():
             'platform': 'VARCHAR(50) NOT NULL DEFAULT \'\'',
             'price': 'REAL NOT NULL DEFAULT 0',
             'url': 'VARCHAR(255)',
+            'rolls_per_pack': 'INTEGER DEFAULT 1',
             'timestamp': 'DATETIME',
         },
         'taobao_stores': {

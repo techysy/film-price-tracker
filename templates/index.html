@@ -47,6 +47,7 @@
 
 <div class="row" id="film-list">
     {% for film in films %}
+    {% if film.price_histories %}
     <div class="col-md-4 mb-4 film-item"
          data-format="{{ film.format or '' }}"
          data-type="{{ film.film_type or '' }}"
@@ -67,6 +68,7 @@
             </div>
         </a>
     </div>
+    {% endif %}
     {% endfor %}
 </div>
 

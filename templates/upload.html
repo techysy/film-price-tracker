@@ -10,7 +10,7 @@
         <div class="card">
             <div class="card-body">
                 <h5 class="card-title">上传截图</h5>
-                <p class="card-text mb-3">支持粘贴 (Ctrl+V)、拖拽或点击选择购物车截图</p>
+                <p class="card-text mb-3">支持粘贴 (Ctrl+V)、拖拽或点击选择购物车/订单截图</p>
 
                 <div id="drop-zone" class="drop-zone">
                     <div class="drop-zone-content">
@@ -161,12 +161,32 @@
     }
     loadFilms();
 
+    const MODEL_KEYWORDS = {
+        'colorplus': ['colorplus', '易拍', 'color plus'],
+        'gold': ['gold', '金200', '金 200'],
+        'ultramax': ['ultramax', '全能', 'ultra max'],
+        'portra': ['portra', '波特拉'],
+        'ektar': ['ektar', '依克塔'],
+        'provia': ['provia', '普罗维亚'],
+        'velvia': ['velvia', '维尔维亚'],
+        'cinestill': ['cinestill', '电影卷'],
+        'superia': ['superia', '世霸'],
+        'c200': ['c200', 'c 200'],
+        'c400': ['c400', 'c 400'],
+        'hp5': ['hp5', 'hp 5'],
+        'delta': ['delta'],
+        'fomapan': ['fomapan'],
+        'pan400': ['pan400', 'pan 400'],
+        'ek100': ['ek100', 'ek 100'],
+    };
+
     function matchFilm(item) {
         let best = null, bestScore = 0;
         const title = (item.title || '').toLowerCase();
         for (const f of allFilms) {
             let score = 0;
             const brand = (f.brand || '').toLowerCase();
+            const model = (f.model || '').toLowerCase();
             if (brand && title.includes(brand)) score += 10;
             if (f.iso && title.includes(String(f.iso))) score += 5;
             if (f.format) {
@@ -183,35 +203,78 @@
                 else if (ft.includes('电影卷') && (title.includes('电影卷') || title.includes('vision'))) score += 3;
                 else if (ft.includes('一次成像') && (title.includes('instax') || title.includes('polaroid'))) score += 3;
             }
+            if (model) {
+                for (const [key, aliases] of Object.entries(MODEL_KEYWORDS)) {
+                    if (model.includes(key)) {
+                        for (const alias of aliases) {
+                            if (title.includes(alias)) { score += 20; break; }
+                        }
+                        break;
+                    }
+                }
+            }
             if (score > bestScore) { bestScore = score; best = f; }
         }
         return bestScore >= 5 ? best : null;
     }
 
     function renderItems(items) {
-        let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr><th>店铺</th><th>商品</th><th>匹配胶片</th><th>价格</th><th></th></tr></thead><tbody>';
+        let html = '';
+        const hasOrder = items.length > 0 && items[0].order_date;
+        if (hasOrder) {
+            const first = items[0];
+            const orderDate = (first.order_date || '').replace(/-/g, '.');
+            html += `<div class="ocr-order-info">
+                <span class="ocr-order-tag">订单</span>
+                <span>${escHtml(orderDate)}</span>
+                <span class="ocr-order-sep"></span>
+                <span>${escHtml(first.order_no)}</span>
+                <span class="ocr-order-sep"></span>
+                <span>${escHtml(first.store)}</span>
+            </div>`;
+        }
+
         items.forEach((item, i) => {
             const matched = matchFilm(item);
             item.film_id = matched ? matched.id : null;
-            let filmCell;
+            if (!item.rolls_per_pack) item.rolls_per_pack = 1;
+            const perRoll = item.rolls_per_pack > 1 ? (item.price / item.rolls_per_pack).toFixed(2) : null;
+
+            let filmBadge;
             if (matched) {
-                filmCell = `<span class="badge" style="background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);font-size:0.8rem;">${escHtml(matched.brand)} ${escHtml(matched.model)}</span>`;
+                filmBadge = `<span class="film-badge">${escHtml(matched.brand)} ${escHtml(matched.model)}</span>`;
             } else {
-                let opts = '<option value="">-- 选择胶片 --</option>';
+                let opts = '<option value="">选择胶片</option>';
                 allFilms.forEach(f => {
                     opts += `<option value="${f.id}">${escHtml(f.brand)} ${escHtml(f.model)}</option>`;
                 });
-                filmCell = `<select class="form-select form-select-sm" style="width:auto;font-size:0.8rem;background:var(--bg-input);border:1px solid var(--danger-border);color:var(--danger);border-radius:6px;padding:0.2rem 0.5rem;" onchange="currentItems[${i}].film_id=this.value||null; this.style.borderColor=this.value?'var(--success-border)':'var(--danger-border)'; this.style.color=this.value?'var(--success)':'var(--danger)';">${opts}</select>`;
+                filmBadge = `<select class="film-select" onchange="currentItems[${i}].film_id=this.value||null; this.className=this.value?'film-select film-ok':'film-select film-err';">${opts}</select>`;
             }
-            html += `<tr>
-                <td style="white-space:nowrap">${escHtml(item.store)}</td>
-                <td style="max-width:220px;font-size:0.85rem;">${escHtml(item.title)}</td>
-                <td>${filmCell}</td>
-                <td class="text-danger fw-bold">¥${item.price}</td>
-                <td><button class="btn btn-sm btn-outline-danger" onclick="removeItem(${i})">删除</button></td>
-            </tr>`;
+
+            const packHtml = item.rolls_per_pack > 1
+                ? `<span class="ph-tag">${item.rolls_per_pack}卷装 单卷¥${perRoll}</span>`
+                : `<button class="ph-add-pack" onclick="currentItems[${i}].rolls_per_pack=2;renderItems(currentItems);">+设置每盒卷数</button>`;
+
+            html += `<div class="ocr-card">
+                <div class="ocr-card-header">
+                    <input type="text" class="ocr-title-input" value="${escAttr(item.title)}" onchange="currentItems[${i}].title=this.value;">
+                    <div class="ocr-card-actions">${filmBadge}<button class="ocr-del-btn" onclick="removeItem(${i})">&#10005;</button></div>
+                </div>
+                <div class="ocr-card-body">
+                    <span class="ocr-store">${escHtml(item.store)}</span>
+                    <div class="ocr-price-row">
+                        <span class="ocr-label">单价</span>
+                        <input type="number" step="0.01" class="ocr-num-input" value="${item.unit_price}" onchange="currentItems[${i}].unit_price=parseFloat(this.value)||0;currentItems[${i}].price=currentItems[${i}].unit_price*currentItems[${i}].quantity;renderItems(currentItems);">
+                        <span class="ocr-multiply">&times;</span>
+                        <input type="number" min="1" class="ocr-num-input" style="width:44px;" value="${item.quantity}" onchange="currentItems[${i}].quantity=parseInt(this.value)||1;currentItems[${i}].price=currentItems[${i}].unit_price*currentItems[${i}].quantity;renderItems(currentItems);">
+                        <span class="ocr-equal">=</span>
+                        <span class="ocr-total">¥${item.price}</span>
+                        <span class="ocr-sep"></span>
+                        ${packHtml}
+                    </div>
+                </div>
+            </div>`;
         });
-        html += '</tbody></table></div>';
         ocrResults.innerHTML = html;
     }
 
@@ -252,8 +315,11 @@
 
     function escHtml(s) {
         const d = document.createElement('div');
-        d.textContent = s;
+        d.textContent = s || '';
         return d.innerHTML;
+    }
+    function escAttr(s) {
+        return (s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 })();
 </script>
@@ -279,6 +345,192 @@
 }
 .drop-zone-content small {
     color: var(--text-faint);
+}
+.ocr-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-elevated);
+    margin-bottom: 0.625rem;
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+.ocr-card:hover {
+    border-color: var(--border-hover);
+}
+.ocr-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-input);
+}
+.ocr-title-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text);
+    outline: none;
+    padding: 0.2rem 0;
+}
+.ocr-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+.film-badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 500;
+    padding: 0.2rem 0.55rem;
+    border-radius: 6px;
+    background: var(--success-bg);
+    color: var(--success);
+    border: 1px solid var(--success-border);
+    white-space: nowrap;
+}
+.film-select {
+    font-size: 0.72rem;
+    padding: 0.2rem 0.4rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-input);
+    background: var(--bg-input);
+    color: var(--text);
+    outline: none;
+    max-width: 130px;
+}
+.film-select.film-ok {
+    border-color: var(--success-border);
+    color: var(--success);
+}
+.film-select.film-err {
+    border-color: var(--danger-border);
+    color: var(--danger);
+}
+.ocr-del-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+.ocr-del-btn:hover {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+.ocr-card-body {
+    padding: 0.6rem 0.85rem 0.7rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+.ocr-store {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+.ocr-price-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    font-size: 0.82rem;
+}
+.ocr-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.ocr-num-input {
+    width: 60px;
+    height: 28px;
+    border: 1px solid var(--border-input);
+    border-radius: 6px;
+    background: var(--bg-input);
+    color: var(--text);
+    font-size: 0.8rem;
+    text-align: center;
+    outline: none;
+    padding: 0;
+    transition: border-color 0.2s;
+}
+.ocr-num-input:focus {
+    border-color: var(--accent);
+}
+.ocr-multiply, .ocr-equal {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+.ocr-total {
+    font-weight: 600;
+    color: var(--danger);
+    font-size: 0.88rem;
+}
+.ocr-sep {
+    width: 1px;
+    height: 14px;
+    background: var(--border);
+    margin: 0 0.15rem;
+}
+.ph-tag {
+    font-size: 0.72rem;
+    color: var(--accent);
+    background: var(--primary-soft);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+.ph-add-pack {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    background: none;
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    padding: 0.12rem 0.45rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.ph-add-pack:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.ocr-order-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.85rem;
+    border-radius: 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.625rem;
+    flex-wrap: wrap;
+}
+.ocr-order-tag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    background: var(--primary-soft);
+    color: var(--accent);
+}
+.ocr-order-sep {
+    width: 1px;
+    height: 12px;
+    background: var(--border);
 }
 </style>
 {% endblock %}

@@ -26,21 +26,21 @@
         </svg>
     </div>
     <form method="POST" action="{{ url_for('main.film_add') }}" class="store-add-form">
-        <input type="text" class="store-input" name="brand" placeholder="品牌（如 柯达）" required style="flex:0 0 140px;">
-        <input type="text" class="store-input" name="model" placeholder="型号（如 GOLD200）" required style="flex:1;">
-        <select class="store-input" name="format" style="flex:0 0 120px;">
+        <input type="text" class="store-input" name="brand" placeholder="品牌" required style="flex:1 1 80px;min-width:0;">
+        <input type="text" class="store-input" name="model" placeholder="型号" required style="flex:1 1 100px;min-width:0;">
+        <select class="store-input" name="format" style="flex:1 1 80px;min-width:0;">
             <option value="">画幅</option>
             {% for fmt in ['35mm','120','220','大画幅','拍立得Mini','拍立得SQ','拍立得Wide','宝丽来'] %}
             <option value="{{ fmt }}">{{ fmt }}</option>
             {% endfor %}
         </select>
-        <select class="store-input" name="film_type" style="flex:0 0 110px;">
+        <select class="store-input" name="film_type" style="flex:1 1 80px;min-width:0;">
             <option value="">类型</option>
             {% for ft in ['彩负','黑白','反转','电影卷','彩色一次成像','黑白一次成像'] %}
             <option value="{{ ft }}">{{ ft }}</option>
             {% endfor %}
         </select>
-        <input type="text" class="store-input" name="iso" placeholder="ISO" style="flex:0 0 80px;">
+        <input type="text" class="store-input" name="iso" placeholder="ISO" style="flex:1 1 60px;min-width:0;">
         <button type="submit" class="store-add-btn">添加</button>
     </form>
 </div>
@@ -64,7 +64,7 @@
         </div>
         {% if film.created_at %}
         <div class="store-card-meta">
-            <span class="store-date">{{ film.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+            <span class="store-date">{{ film.created_at.strftime('%Y.%m.%d %H:%M') }}</span>
         </div>
         {% endif %}
         <div class="store-card-actions">

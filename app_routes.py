@@ -136,6 +136,10 @@ def parse_ocr_lines(ocr_result):
             text = item[1]
             lines.append(text)
 
+    order_info = detect_order(lines)
+    if order_info:
+        return parse_order_lines(lines, order_info)
+
     SKIP_PATTERNS = ['88VIP', '退货', '退款', '删除', '移入收藏', '商品规格', '含税', '有效期',
                      '立即购买', '已选', '库存', '配送', '服务', '保障', '评价']
     results = []
@@ -190,10 +194,145 @@ def parse_ocr_lines(ocr_result):
                  'portra', 'gold', 'ultra', 'ektar', 'provia', 'velvia', 'cinestill',
                  'fomapan', 'hp5', 'delta', 'pan400', 'colorplus', 'lomo', 'wolfen',
                  'orwo', 'agfa', 'cn400', 'cn800', 'nc400', '5207', '5219', '5203', '5222',
-                 'phoenix', 'instax', 'polaroid', '宝丽来', '拍立得', '测试卷', '片头卷'])
+                 'phoenix', 'instax', 'polaroid', '宝丽来', '拍立得', '测试卷', '片头卷',
+                 'c200', 'c400', 'gold200', 'ultramax', 'ek100', 'ek100ii',
+                 'pro400h', 'superia', 'velvia50', 'velvia100', 'provia100f',
+                 '100度', '200度', '400度', '800度', '1600度',
+                 '负片胶', '彩色负', '彩色胶'])
             if has_film_keyword:
                 pending_title = line
 
+    return results
+
+
+def detect_order(lines):
+    order_date = ''
+    order_no = ''
+    order_store = ''
+    for line in lines:
+        line = line.strip()
+        date_match = re.match(r'^(\d{4}[-/]\d{1,2}[-/]\d{1,2})', line)
+        if date_match:
+            order_date = date_match.group(1)
+        no_match = re.search(r'订单号[：:\s]*(\d+)', line)
+        if no_match:
+            order_no = no_match.group(1)
+        if not order_store and re.search(r'(淘宝|天猫|京东)\s+(.+)', line):
+            store_match = re.search(r'(淘宝|天猫|京东)\s+(.+)', line)
+            order_store = store_match.group(2).strip()
+        if not order_store and re.search(r'(irohas|camera|store|shop)', line.lower()):
+            if len(line) < 30:
+                order_store = line
+
+    if not order_date and not order_no:
+        return None
+    return {
+        'date': order_date,
+        'order_no': order_no,
+        'store': order_store or '未知店铺',
+    }
+
+
+def parse_order_lines(lines, order_info):
+    results = []
+    pending_title = ''
+    pending_price = 0
+    pending_qty = 1
+
+    SKIP_PATTERNS = ['88VIP', '退货', '退款', '删除', '移入收藏', '商品规格', '含税',
+                     '立即购买', '已选', '库存', '配送', '服务', '保障', '评价',
+                     '申请售后', '再买一单', '加入购物车', '手机订单', '订单详情',
+                     '交易成功', '7天无理由退货', '实付款', '含运费', '手机订单',
+                     '7天无理由']
+
+    FILM_KEYWORDS = ['胶卷', '胶片', 'kodak', '柯达', 'fuji', '富士', 'ilford', '伊尔福',
+             '120', '135', '35mm', '负片', '反转', '彩负', '黑白', 'iso',
+             'portra', 'gold', 'ultra', 'ektar', 'provia', 'velvia', 'cinestill',
+             'fomapan', 'hp5', 'delta', 'pan400', 'colorplus', 'lomo', 'wolfen',
+             'orwo', 'agfa', 'cn400', 'cn800', 'nc400', '5207', '5219', '5203', '5222',
+             'phoenix', 'instax', 'polaroid', '宝丽来', '拍立得', '测试卷', '片头卷',
+             'c200', 'c400', 'gold200', 'ultramax', 'ek100', 'ek100ii',
+             'pro400h', 'superia', 'velvia50', 'velvia100', 'provia100f',
+             '100度', '200度', '400度', '800度', '1600度',
+             '负片胶', '彩色负', '彩色胶', 'color']
+
+    def flush():
+        nonlocal pending_title, pending_price, pending_qty
+        if pending_title and pending_price > 0:
+            results.append({
+                'store': order_info['store'],
+                'title': pending_title,
+                'price': pending_price * pending_qty,
+                'quantity': pending_qty,
+                'unit_price': pending_price,
+                'order_date': order_info['date'],
+                'order_no': order_info['order_no'],
+            })
+        pending_title = ''
+        pending_price = 0
+        pending_qty = 1
+
+    def extract_inline_qty(text):
+        m = re.search(r'[x×]\s*(\d+)\b', text)
+        if m:
+            return int(m.group(1))
+        return 1
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        if any(kw in line for kw in SKIP_PATTERNS):
+            continue
+        if re.match(r'^[\d\s\-/]+$', line):
+            continue
+        if line in ('淘宝', '天猫', '京东', '淘宝网', '订单详情'):
+            continue
+
+        qty_match = re.match(r'^[x×]\s*(\d+)$', line)
+        if qty_match:
+            pending_qty = int(qty_match.group(1))
+            flush()
+            continue
+
+        price_match = re.search(r'[¥￥]\s*(\d+\.?\d*)', line)
+        if price_match:
+            price = float(price_match.group(1))
+            if price <= 0:
+                continue
+
+            rest_before = line[:price_match.start()].strip()
+            rest_after = line[price_match.end():].strip()
+
+            inline_qty = extract_inline_qty(rest_after)
+
+            if rest_before and len(rest_before) > 2:
+                flush()
+                pending_title = rest_before
+                pending_price = price
+                pending_qty = inline_qty
+                flush()
+            elif pending_title:
+                pending_price = price
+                pending_qty = inline_qty
+                flush()
+            else:
+                has_film_kw = any(kw in line.lower() for kw in FILM_KEYWORDS)
+                if has_film_kw:
+                    pending_title = line
+                    pending_price = price
+                    pending_qty = inline_qty
+                    flush()
+            continue
+
+        has_film_keyword = any(kw in line.lower() for kw in FILM_KEYWORDS)
+        if has_film_keyword:
+            if pending_title and pending_price > 0:
+                flush()
+            pending_title = line
+
+    flush()
     return results
 
 
@@ -226,9 +365,11 @@ def film_detail(film_id):
         for ph in price_histories:
             if ph.platform not in platforms:
                 platforms[ph.platform] = []
+            rolls = ph.rolls_per_pack or 1
+            per_roll_price = ph.price / rolls if rolls > 1 else ph.price
             platforms[ph.platform].append({
                 'x': ph.timestamp.strftime('%Y-%m-%d %H:%M'),
-                'y': ph.price
+                'y': round(per_roll_price, 2)
             })
 
         return render_template('film_detail.html', film=film, platforms=platforms)
@@ -249,15 +390,35 @@ def api_price_history(film_id):
 
         data = [
             {
+                'id': ph.id,
                 'timestamp': ph.timestamp.isoformat(),
                 'price': ph.price,
                 'platform': ph.platform,
-                'url': ph.url
+                'url': ph.url,
+                'rolls_per_pack': ph.rolls_per_pack or 1,
             }
             for ph in price_histories
         ]
 
         return jsonify(data)
+    finally:
+        session.close()
+
+
+@main.route('/api/price_history/delete/<int:ph_id>', methods=['POST'])
+def api_price_history_delete(ph_id):
+    session = SessionLocal()
+    try:
+        ph = session.query(PriceHistory).get(ph_id)
+        if not ph:
+            return jsonify({'error': '记录不存在'}), 404
+        film_id = ph.film_id
+        session.delete(ph)
+        session.commit()
+        return jsonify({'ok': True, 'film_id': film_id})
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
     finally:
         session.close()
 
@@ -282,6 +443,7 @@ def export_json():
                 platforms[ph.platform].append({
                     'timestamp': ph.timestamp.strftime('%Y-%m-%d %H:%M'),
                     'price': ph.price,
+                    'rolls_per_pack': ph.rolls_per_pack or 1,
                     'url': ph.url,
                 })
             data.append({
@@ -451,14 +613,34 @@ def api_film_match():
 
     title = data['title'].lower()
     session = SessionLocal()
+
+    MODEL_KEYWORDS = {
+        'colorplus': ['colorplus', '易拍', 'color plus'],
+        'gold': ['gold', '金200', '金 200'],
+        'ultramax': ['ultramax', '全能', 'ultra max'],
+        'portra': ['portra', '波特拉'],
+        'ektar': ['ektar', '依克塔'],
+        'provia': ['provia', '普罗维亚'],
+        'velvia': ['velvia', '维尔维亚'],
+        'cinestill': ['cinestill', '电影卷'],
+        'superia': ['superia', '世霸'],
+        'c200': ['c200', 'c 200'],
+        'c400': ['c400', 'c 400'],
+        'hp5': ['hp5', 'hp 5'],
+        'delta': ['delta'],
+        'fomapan': ['fomapan'],
+        'pan400': ['pan400', 'pan 400'],
+        'ek100': ['ek100', 'ek 100'],
+    }
+
     try:
         films = session.query(Film).all()
         best = None
         best_score = 0
         for film in films:
             score = 0
-            name = f'{film.brand} {film.model}'.lower()
             brand_l = (film.brand or '').lower()
+            model_l = (film.model or '').lower()
             if brand_l and brand_l in title:
                 score += 10
             if film.iso:
@@ -485,6 +667,14 @@ def api_film_match():
                     score += 3
                 elif '一次成像' in ft and ('一次成像' in title or 'instax' in title or 'polaroid' in title):
                     score += 3
+            if model_l:
+                for key, aliases in MODEL_KEYWORDS.items():
+                    if key in model_l:
+                        for alias in aliases:
+                            if alias in title:
+                                score += 20
+                                break
+                        break
             if score > best_score:
                 best_score = score
                 best = film
@@ -672,7 +862,19 @@ def api_save():
                 skipped += 1
                 continue
 
-            ph = PriceHistory(film_id=film.id, platform=store_name, price=price, url=url)
+            timestamp = None
+            order_date = item.get('order_date', '')
+            if order_date:
+                try:
+                    timestamp = datetime.strptime(order_date, '%Y-%m-%d')
+                except ValueError:
+                    pass
+
+            rolls_per_pack = item.get('rolls_per_pack', 1) or 1
+
+            ph = PriceHistory(film_id=film.id, platform=store_name, price=price, url=url, rolls_per_pack=rolls_per_pack)
+            if timestamp:
+                ph.timestamp = timestamp
             session.add(ph)
             session.commit()
             saved += 1
@@ -689,9 +891,30 @@ def _match_film(title, all_films):
     title_lower = title.lower()
     best = None
     best_score = 0
+
+    MODEL_KEYWORDS = {
+        'colorplus': ['colorplus', '易拍', 'color plus'],
+        'gold': ['gold', '金200', '金 200'],
+        'ultramax': ['ultramax', '全能', 'ultra max'],
+        'portra': ['portra', '波特拉'],
+        'ektar': ['ektar', '依克塔'],
+        'provia': ['provia', '普罗维亚'],
+        'velvia': ['velvia', '维尔维亚'],
+        'cinestill': ['cinestill', '电影卷'],
+        'superia': ['superia', '世霸'],
+        'c200': ['c200', 'c 200'],
+        'c400': ['c400', 'c 400'],
+        'hp5': ['hp5', 'hp 5'],
+        'delta': ['delta'],
+        'fomapan': ['fomapan'],
+        'pan400': ['pan400', 'pan 400'],
+        'ek100': ['ek100', 'ek 100'],
+    }
+
     for film in all_films:
         score = 0
         brand_l = (film.brand or '').lower()
+        model_l = (film.model or '').lower()
         if brand_l and brand_l in title_lower:
             score += 10
         if film.iso and str(film.iso) in title_lower:
@@ -716,6 +939,14 @@ def _match_film(title, all_films):
                 score += 3
             elif '一次成像' in ft and ('一次成像' in title_lower or 'instax' in title_lower or 'polaroid' in title_lower):
                 score += 3
+        if model_l:
+            for key, aliases in MODEL_KEYWORDS.items():
+                if key in model_l:
+                    for alias in aliases:
+                        if alias in title_lower:
+                            score += 20
+                            break
+                    break
         if score > best_score:
             best_score = score
             best = film
