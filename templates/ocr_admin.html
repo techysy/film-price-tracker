@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+
+{% block title %}OCR 管理 - 胶卷价格追踪{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">OCR 识别模型管理</h1>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card">
+            <details open>
+                <summary class="card-body card-summary">
+                    <div class="d-flex justify-content-between align-items-center w-100">
+                        <h5 class="card-title mb-0">识别参数配置</h5>
+                        <small class="text-muted">点击展开/收起</small>
+                    </div>
+                </summary>
+                <div class="card-body pt-0">
+                    <hr class="my-3">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label d-flex justify-content-between">
+                                    <span>文本置信度阈值</span>
+                                    <span id="text-score-value" class="text-muted">{{ config.text_score }}</span>
+                                </label>
+                                <input type="range" class="form-range" id="text-score" min="0" max="1" step="0.05" value="{{ config.text_score }}">
+                                <small class="text-muted">值越高越严格（推荐 0.3~0.7）</small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">最小高度约束</label>
+                                <input type="number" class="form-control form-control-sm" id="min-height" value="{{ config.min_height }}" min="1" max="200">
+                                <small class="text-muted">忽略小于此值的文字（像素）</small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">最大边长</label>
+                                <input type="number" class="form-control form-control-sm" id="max-side-len" value="{{ config.max_side_len }}" min="100" max="10000">
+                                <small class="text-muted">超出将被缩放</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="use-det" {{ 'checked' if config.use_det else '' }}>
+                                    <label class="form-check-label" for="use-det">启用文本检测</label>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="use-cls" {{ 'checked' if config.use_cls else '' }}>
+                                    <label class="form-check-label" for="use-cls">启用文本分类</label>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="use-rec" {{ 'checked' if config.use_rec else '' }}>
+                                    <label class="form-check-label" for="use-rec">启用文本识别</label>
+                                </div>
+                            </div>
+
+                            <hr>
+                            <h6 class="mb-2">忽略边框区域</h6>
+                            <div class="mb-2">
+                                <label class="form-label d-flex justify-content-between" style="font-size:0.8rem">
+                                    <span>顶部</span>
+                                    <span id="ignore-top-value" class="text-muted">{{ config.ignore_top }}%</span>
+                                </label>
+                                <input type="range" class="form-range form-range-sm" id="ignore-top" min="0" max="30" step="1" value="{{ config.ignore_top }}">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label d-flex justify-content-between" style="font-size:0.8rem">
+                                    <span>底部</span>
+                                    <span id="ignore-bottom-value" class="text-muted">{{ config.ignore_bottom }}%</span>
+                                </label>
+                                <input type="range" class="form-range form-range-sm" id="ignore-bottom" min="0" max="30" step="1" value="{{ config.ignore_bottom }}">
+                            </div>
+                            <small class="text-muted">过滤标题栏、水印等 UI 元素</small>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-3">
+                        <button id="btn-apply" class="btn btn-primary flex-fill">应用（实时生效）</button>
+                        <button id="btn-save" class="btn btn-outline-success flex-fill">保存（持久化）</button>
+                    </div>
+                    <div id="config-status" class="mt-2"></div>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">测试识别</h5>
+                <p class="card-text mb-3" style="font-size:0.85rem">上传截图测试识别效果</p>
+
+                <div id="test-drop-zone" class="drop-zone">
+                    <div class="drop-zone-content">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.3">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                        <p>粘贴或拖入截图</p>
+                        <small class="text-muted">Ctrl+V / 拖拽 / 点击选择</small>
+                    </div>
+                    <input type="file" id="test-file-input" accept="image/*" style="display:none">
+                </div>
+
+                <div id="test-preview" style="display:none" class="mt-3">
+                    <img id="test-preview-img" class="img-fluid rounded" style="max-height:200px;width:100%;object-fit:contain;background:var(--bg-input);border:1px solid var(--border);border-radius:10px;">
+                    <div class="mt-2 d-flex gap-2">
+                        <button id="btn-test-ocr" class="btn btn-primary flex-fill">开始测试</button>
+                        <button id="btn-test-clear" class="btn btn-outline-danger">清除</button>
+                    </div>
+                </div>
+
+                <div id="test-status" class="mt-3"></div>
+                <div id="test-results" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const textScore = document.getElementById('text-score');
+    const textScoreValue = document.getElementById('text-score-value');
+    const useDet = document.getElementById('use-det');
+    const useCls = document.getElementById('use-cls');
+    const useRec = document.getElementById('use-rec');
+    const minHeight = document.getElementById('min-height');
+    const maxSideLen = document.getElementById('max-side-len');
+    const ignoreTop = document.getElementById('ignore-top');
+    const ignoreTopValue = document.getElementById('ignore-top-value');
+    const ignoreBottom = document.getElementById('ignore-bottom');
+    const ignoreBottomValue = document.getElementById('ignore-bottom-value');
+    const btnApply = document.getElementById('btn-apply');
+    const btnSave = document.getElementById('btn-save');
+    const configStatus = document.getElementById('config-status');
+
+    textScore.addEventListener('input', () => { textScoreValue.textContent = textScore.value; });
+    ignoreTop.addEventListener('input', () => { ignoreTopValue.textContent = ignoreTop.value + '%'; });
+    ignoreBottom.addEventListener('input', () => { ignoreBottomValue.textContent = ignoreBottom.value + '%'; });
+
+    function getConfig() {
+        return {
+            text_score: parseFloat(textScore.value),
+            use_det: useDet.checked,
+            use_cls: useCls.checked,
+            use_rec: useRec.checked,
+            min_height: parseInt(minHeight.value) || 30,
+            max_side_len: parseInt(maxSideLen.value) || 2000,
+            ignore_top: parseInt(ignoreTop.value) || 0,
+            ignore_bottom: parseInt(ignoreBottom.value) || 0
+        };
+    }
+
+    function showStatus(msg, type) {
+        configStatus.innerHTML = `<div class="alert alert-${type} mb-0 py-1" style="font-size:0.85rem">${msg}</div>`;
+        setTimeout(() => { configStatus.innerHTML = ''; }, 3000);
+    }
+
+    btnApply.addEventListener('click', async () => {
+        btnApply.disabled = true;
+        btnApply.textContent = '应用中...';
+        try {
+            const resp = await fetch('/api/ocr-config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(getConfig())
+            });
+            const data = await resp.json();
+            showStatus(data.error || '配置已应用，引擎已重建', data.error ? 'danger' : 'success');
+            if (window.showToast) showToast(data.error || '配置已应用', data.error ? 'error' : 'success');
+        } catch(e) {
+            showStatus('请求失败: ' + e.message, 'danger');
+        }
+        btnApply.disabled = false;
+        btnApply.textContent = '应用（实时生效）';
+    });
+
+    btnSave.addEventListener('click', async () => {
+        btnSave.disabled = true;
+        btnSave.textContent = '保存中...';
+        try {
+            const resp = await fetch('/api/ocr-config/save', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(getConfig())
+            });
+            const data = await resp.json();
+            showStatus(data.error || '配置已保存', data.error ? 'danger' : 'success');
+            if (window.showToast) showToast(data.error || '配置已保存', data.error ? 'error' : 'success');
+        } catch(e) {
+            showStatus('保存失败: ' + e.message, 'danger');
+        }
+        btnSave.disabled = false;
+        btnSave.textContent = '保存（持久化）';
+    });
+
+    // ========== 测试识别 ==========
+    const testDropZone = document.getElementById('test-drop-zone');
+    const testFileInput = document.getElementById('test-file-input');
+    const testPreview = document.getElementById('test-preview');
+    const testPreviewImg = document.getElementById('test-preview-img');
+    const btnTestOcr = document.getElementById('btn-test-ocr');
+    const btnTestClear = document.getElementById('btn-test-clear');
+    const testStatus = document.getElementById('test-status');
+    const testResults = document.getElementById('test-results');
+
+    let currentTestImage = null;
+
+    testDropZone.addEventListener('click', () => testFileInput.click());
+    testFileInput.addEventListener('change', (e) => handleTestFile(e.target.files[0]));
+
+    testDropZone.addEventListener('dragover', (e) => { e.preventDefault(); testDropZone.classList.add('dragover'); });
+    testDropZone.addEventListener('dragleave', () => testDropZone.classList.remove('dragover'));
+    testDropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        testDropZone.classList.remove('dragover');
+        handleTestFile(e.dataTransfer.files[0]);
+    });
+
+    document.addEventListener('paste', (e) => {
+        if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+        const items = e.clipboardData.items;
+        for (const item of items) {
+            if (item.type.startsWith('image/')) {
+                handleTestFile(item.getAsFile());
+                break;
+            }
+        }
+    });
+
+    function handleTestFile(file) {
+        if (!file || !file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            currentTestImage = e.target.result;
+            testPreviewImg.src = currentTestImage;
+            testPreview.style.display = 'block';
+            testDropZone.style.display = 'none';
+            testResults.innerHTML = '';
+            testStatus.innerHTML = '';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    btnTestClear.addEventListener('click', () => {
+        currentTestImage = null;
+        testPreview.style.display = 'none';
+        testDropZone.style.display = 'block';
+        testResults.innerHTML = '';
+        testStatus.innerHTML = '';
+        testFileInput.value = '';
+    });
+
+    btnTestOcr.addEventListener('click', async () => {
+        if (!currentTestImage) return;
+        testStatus.innerHTML = '<div class="alert alert-info py-1 mb-2" style="font-size:0.85rem">识别中...</div>';
+        testResults.innerHTML = '';
+        btnTestOcr.disabled = true;
+
+        try {
+            const resp = await fetch('/api/ocr/test', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({image: currentTestImage})
+            });
+            const data = await resp.json();
+            if (data.error) {
+                testStatus.innerHTML = `<div class="alert alert-danger py-1 mb-2" style="font-size:0.85rem">${data.error}</div>`;
+                return;
+            }
+            if (data.raw_lines && data.raw_lines.length > 0) {
+                testStatus.innerHTML = `<div class="alert alert-success py-1 mb-2" style="font-size:0.85rem">识别到 ${data.raw_lines.length} 行文本</div>`;
+            } else {
+                testStatus.innerHTML = '<div class="alert alert-warning py-1 mb-2" style="font-size:0.85rem">未识别到任何文本</div>';
+                return;
+            }
+
+            const ocrText = data.raw_lines.join('\n');
+            let resultsHtml = `<div class="copy-box">
+                <button class="copy-btn" onclick="copyOcrText(this)" data-text="${escAttr(ocrText)}">复制</button>
+                <pre style="font-size:0.78rem;max-height:350px;overflow:auto;background:var(--bg-input);padding:0.65rem;border-radius:8px;white-space:pre-wrap;margin:0;">${escHtml(ocrText)}</pre>
+            </div>`;
+            testResults.innerHTML = resultsHtml;
+        } catch(e) {
+            testStatus.innerHTML = `<div class="alert alert-danger py-1 mb-2" style="font-size:0.85rem">请求失败: ${e.message}</div>`;
+        }
+        btnTestOcr.disabled = false;
+    });
+
+    function escHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s || '';
+        return d.innerHTML;
+    }
+    function escAttr(s) {
+        return (s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    window.copyOcrText = async function(btn) {
+        const text = btn.getAttribute('data-text');
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch(e) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+        btn.textContent = '已复制';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = '复制'; btn.classList.remove('copied'); }, 1500);
+    };
+})();
+</script>
+
+<style>
+.drop-zone {
+    border: 2px dashed var(--border-input);
+    border-radius: 12px;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: var(--bg-input);
+}
+.drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--accent);
+    background: var(--primary-soft);
+}
+.drop-zone-content p {
+    color: var(--text-secondary);
+    margin: 0.5rem 0 0.25rem;
+    font-weight: 500;
+}
+.copy-box {
+    position: relative;
+    margin-top: 0.5rem;
+}
+.copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    cursor: pointer;
+    z-index: 1;
+    transition: all 0.15s;
+}
+.copy-btn:hover {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+.copy-btn.copied {
+    background: var(--success);
+    color: #fff;
+    border-color: var(--success);
+}
+.card-summary {
+    cursor: pointer;
+    user-select: none;
+}
+.card-summary::-webkit-details-marker { display: none; }
+.card-summary::marker { display: none; content: ''; }
+</style>
+{% endblock %}

@@ -156,8 +156,11 @@ body {
 }
 
 .nav-link.active {
-    color: var(--text-heading) !important;
-    background: var(--primary-soft);
+    color: var(--primary) !important;
+    background: var(--primary-soft) !important;
+    font-weight: 600;
+    border-bottom: 2px solid var(--primary);
+    border-radius: 8px 8px 0 0;
 }
 
 .navbar-toggler {
@@ -229,7 +232,7 @@ h5.card-title::before {
     background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: 16px;
-    transition: all 0.3s ease;
+    transition: border-color 0.3s, background 0.3s;
 }
 
 .card:hover {
@@ -335,7 +338,7 @@ h5.card-title::before {
     color: var(--text);
     padding: 0.6rem 1rem;
     font-size: 0.875rem;
-    transition: all 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .form-control:focus {
@@ -343,6 +346,7 @@ h5.card-title::before {
     border-color: var(--border-input-focus);
     box-shadow: 0 0 0 3px var(--primary-glow);
     color: var(--text-heading);
+    outline: 0;
 }
 
 .form-control::placeholder { color: var(--text-faint); }
@@ -682,6 +686,7 @@ h5.card-title::before {
 }
 .store-info {
     min-width: 0;
+    flex: 1;
 }
 .store-name {
     font-weight: 600;
@@ -761,7 +766,7 @@ h5.card-title::before {
     border-radius: 6px;
     font-weight: 500;
 }
-.tag-format { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
+.tag-format { background: rgba(99,102,241,0.15); color: #6366f1; border: 1px solid rgba(99,102,241,0.3); font-weight: 600; }
 .tag-type { background: rgba(251,191,36,0.15); color: #f59e0b; border: 1px solid rgba(251,191,36,0.3); }
 .tag-iso { background: var(--bg-input); color: var(--text-secondary); border: 1px solid var(--border); }
 .tag-expiry { background: var(--bg-input); color: var(--text-muted); border: 1px solid var(--border); }

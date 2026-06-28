@@ -1,5 +1,63 @@
 # 📋 更新日志
 
+## 2026-06-28
+
+### 🔧 OCR 配置系统（移植自 inspection-visualizer）
+
+**新增可配置 OCR 引擎**
+- 支持调节文本置信度阈值（text_score）
+- 支持启用/禁用文本检测（use_det）、分类（use_cls）、识别（use_rec）
+- 支持最小高度约束和最大边长缩放
+- 支持忽略图片顶部/底部区域（过滤标题栏、水印等）
+- 配置持久化到 `ocr_config.json` 文件
+
+**新增 API 端点**
+- `GET /api/ocr-config` — 获取当前 OCR 配置
+- `POST /api/ocr-config` — 实时应用配置（不持久化）
+- `POST /api/ocr-config/save` — 保存配置到文件并重建引擎
+- `GET /api/ocr/model-info` — 获取 OCR 模型信息
+- `POST /api/ocr/test` — 测试 OCR 识别（返回原始文本）
+
+**新增 OCR 管理面板**
+- 隐藏页面 `/ocr-admin`，用于调优 OCR 参数
+- 实时预览配置效果
+- 上传截图测试识别，显示原始文本
+- 支持复制识别结果
+
+---
+
+### 🎨 Toast 通知系统
+
+**新增全局 Toast 通知**
+- 在 `base.html` 添加 toast 容器和 `showToast()` 全局函数
+- 支持 success/error/info/warning 四种类型
+- 3.5 秒自动消失，可手动关闭
+- 替代 `alert()` 提供更好的用户体验
+
+---
+
+### 🎨 UI/UX 改进
+
+**导航栏增强**
+- 新增「OCR」导航链接，指向 OCR 管理面板
+- 链接样式较小且半透明，不干扰主要功能
+
+**CSS 优化**
+- `.nav-link.active` 增加底部边框和加粗效果（标签式激活状态）
+- `.card` 过渡动画从 `all 0.3s ease` 优化为 `border-color 0.3s, background 0.3s`
+- `.form-control` 过渡动画优化，添加 `outline: 0` 到 focus 状态
+- `.store-info` 添加 `flex: 1` 改善布局
+- `.tag-format` 从绿色改为紫色，增加 font-weight
+
+---
+
+### 📁 新增文件
+
+- `ocr_config.json` — OCR 引擎配置文件（默认参数）
+- `templates/ocr_admin.html` — OCR 管理面板模板
+
+---
+
 ## 2026-06-22
 
 ### 🎨 UI 统一：胶片管理与店铺管理对齐

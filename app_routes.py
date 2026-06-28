@@ -9,11 +9,50 @@ from flask import Blueprint, render_template, jsonify, request, redirect, url_fo
 from PIL import Image
 from models.film import SessionLocal, Film, PriceHistory, TaobaoStore
 
-try:
-    from rapidocr_onnxruntime import RapidOCR
-    ocr_engine = RapidOCR()
-except ImportError:
-    ocr_engine = None
+OCR_CONFIG_PATH = Path(__file__).parent / 'ocr_config.json'
+
+_default_ocr_config = {
+    "text_score": 0.5,
+    "use_det": True,
+    "use_cls": True,
+    "use_rec": True,
+    "min_height": 30,
+    "max_side_len": 2000,
+    "ignore_top": 0,
+    "ignore_bottom": 0,
+}
+
+
+def _load_ocr_config():
+    if OCR_CONFIG_PATH.exists():
+        try:
+            with open(OCR_CONFIG_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return _default_ocr_config.copy()
+
+
+def _build_ocr_engine(config=None):
+    if config is None:
+        config = _load_ocr_config()
+    try:
+        from rapidocr_onnxruntime import RapidOCR
+        kwargs = {}
+        if 'text_score' in config:
+            kwargs['text_score'] = config['text_score']
+        if 'use_det' in config:
+            kwargs['use_det'] = config['use_det']
+        if 'use_cls' in config:
+            kwargs['use_cls'] = config['use_cls']
+        if 'use_rec' in config:
+            kwargs['use_rec'] = config['use_rec']
+        return RapidOCR(**kwargs)
+    except ImportError:
+        return None
+
+
+ocr_engine = _build_ocr_engine()
 
 main = Blueprint('main', __name__)
 
@@ -423,6 +462,119 @@ def api_price_history_delete(ph_id):
         session.close()
 
 
+@main.route('/ocr-admin')
+def ocr_admin():
+    config = _load_ocr_config()
+    engine_status = 'running' if ocr_engine else 'not_installed'
+    return render_template('ocr_admin.html', config=config, engine_status=engine_status)
+
+
+@main.route('/api/ocr-config', methods=['GET'])
+def api_ocr_config_get():
+    return jsonify(_load_ocr_config())
+
+
+@main.route('/api/ocr-config', methods=['POST'])
+def api_ocr_config_apply():
+    global ocr_engine
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '请提供配置数据'}), 400
+
+    config = _load_ocr_config()
+    config.update(data)
+
+    new_engine = _build_ocr_engine(config)
+    if new_engine is None:
+        return jsonify({'error': 'OCR 引擎未安装，请运行: pip install rapidocr-onnxruntime'}), 500
+
+    ocr_engine = new_engine
+    return jsonify({'ok': True, 'config': config})
+
+
+@main.route('/api/ocr-config/save', methods=['POST'])
+def api_ocr_config_save():
+    global ocr_engine
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '请提供配置数据'}), 400
+
+    config = _load_ocr_config()
+    config.update(data)
+
+    try:
+        with open(OCR_CONFIG_PATH, 'w', encoding='utf-8') as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return jsonify({'error': f'保存失败: {str(e)}'}), 500
+
+    new_engine = _build_ocr_engine(config)
+    if new_engine is not None:
+        ocr_engine = new_engine
+
+    return jsonify({'ok': True, 'config': config})
+
+
+@main.route('/api/ocr/model-info', methods=['GET'])
+def api_ocr_model_info():
+    if not ocr_engine:
+        return jsonify({'error': 'OCR 引擎未安装'}), 500
+    try:
+        info = {
+            'engine': 'RapidOCR (ONNX Runtime)',
+            'config': _load_ocr_config(),
+        }
+        return jsonify(info)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@main.route('/api/ocr/test', methods=['POST'])
+def api_ocr_test():
+    if not ocr_engine:
+        return jsonify({'error': 'OCR 引擎未安装，请运行: pip install rapidocr-onnxruntime'}), 500
+
+    data = request.get_json()
+    if not data or 'image' not in data:
+        return jsonify({'error': '请提供图片数据'}), 400
+
+    image_data = data['image']
+    if ',' in image_data:
+        image_data = image_data.split(',', 1)[1]
+
+    config = _load_ocr_config()
+    ignore_top = config.get('ignore_top', 0)
+    ignore_bottom = config.get('ignore_bottom', 0)
+
+    try:
+        image_bytes = base64.b64decode(image_data)
+        img = Image.open(io.BytesIO(image_bytes))
+        img_height = img.height
+        top_cutoff = int(img_height * ignore_top / 100) if ignore_top > 0 else 0
+        bottom_cutoff = img_height - int(img_height * ignore_bottom / 100) if ignore_bottom > 0 else img_height
+
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+            img.save(tmp.name)
+            tmp_path = tmp.name
+        result, _ = ocr_engine(tmp_path)
+        Path(tmp_path).unlink(missing_ok=True)
+    except Exception as e:
+        return jsonify({'error': f'图片处理失败: {str(e)}'}), 400
+
+    filtered_result = []
+    for item in (result or []):
+        if item and len(item) >= 2:
+            bbox = item[0]
+            if bbox and len(bbox) >= 4:
+                y_center = (bbox[0][1] + bbox[2][1]) / 2
+                if y_center < top_cutoff or y_center > bottom_cutoff:
+                    continue
+            filtered_result.append(item)
+
+    raw_lines = [item[1] for item in filtered_result if item]
+    return jsonify({'raw_lines': raw_lines, 'config': config})
+
+
 @main.route('/export/json')
 def export_json():
     session = SessionLocal()
@@ -808,9 +960,17 @@ def api_ocr():
     if ',' in image_data:
         image_data = image_data.split(',', 1)[1]
 
+    config = _load_ocr_config()
+    ignore_top = config.get('ignore_top', 0)
+    ignore_bottom = config.get('ignore_bottom', 0)
+
     try:
         image_bytes = base64.b64decode(image_data)
         img = Image.open(io.BytesIO(image_bytes))
+        img_height = img.height
+        top_cutoff = int(img_height * ignore_top / 100) if ignore_top > 0 else 0
+        bottom_cutoff = img_height - int(img_height * ignore_bottom / 100) if ignore_bottom > 0 else img_height
+
         with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
             img.save(tmp.name)
             tmp_path = tmp.name
@@ -819,7 +979,17 @@ def api_ocr():
     except Exception as e:
         return jsonify({'error': f'图片处理失败: {str(e)}'}), 400
 
-    items = parse_ocr_lines(result)
+    filtered_result = []
+    for item in (result or []):
+        if item and len(item) >= 2:
+            bbox = item[0]
+            if bbox and len(bbox) >= 4:
+                y_center = (bbox[0][1] + bbox[2][1]) / 2
+                if y_center < top_cutoff or y_center > bottom_cutoff:
+                    continue
+            filtered_result.append(item)
+
+    items = parse_ocr_lines(filtered_result)
     for item in items:
         info = parse_product_name(item.get('title', ''))
         item['brand'] = info['brand']
@@ -827,7 +997,7 @@ def api_ocr():
         item['film_type'] = info['film_type']
         item['iso'] = info['iso']
         item['expiry'] = info['expiry']
-    return jsonify({'items': items, 'raw_lines': [item[1] for item in (result or []) if item]})
+    return jsonify({'items': items, 'raw_lines': [item[1] for item in filtered_result if item]})
 
 
 @main.route('/api/save', methods=['POST'])

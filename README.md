@@ -9,10 +9,13 @@
 - 📸 **截图识别**：支持 Ctrl+V 粘贴、拖拽、点击上传购物车/订单截图
 - 🧾 **订单识别**：自动识别淘宝/天猫/京东历史订单，解析日期、店铺、数量
 - 🔍 **OCR 识别**：基于 RapidOCR 自动提取商品名称和价格
+- ⚙️ **OCR 配置**：可调节识别参数（置信度阈值、文本检测/分类/识别开关、忽略边框区域）
+- 🔧 **OCR 管理面板**：隐藏页面 `/ocr-admin`，实时调优 OCR 参数并测试识别效果
 - 🎞️ **胶片管理**：预录入胶片库，OCR 识别后自动匹配（型号关键词精准匹配）
 - 📊 **价格趋势**：Chart.js 折线图展示各店铺价格历史
 - 💰 **价格管理**：详情页支持删除历史记录，支持多卷装单卷价格计算
 - 🎨 **主题切换**：深色 / 浅色 / 跟随系统，偏好本地保存
+- 🔔 **Toast 通知**：全局通知系统，替代 alert() 提供更好的用户体验
 - 📁 **双维度筛选**：按画幅 + 类型组合筛选胶卷
 - 📦 **数据导出**：下拉菜单导出为 JSON / 自包含 HTML 文件
 - 🏪 **店铺管理**：管理淘宝店铺列表，支持批量导入
@@ -103,6 +106,17 @@ python app.py
 - ✏️ 编辑店铺信息
 - 🔗 快速跳转访问店铺网页
 
+### ⚙️ OCR 管理面板
+
+访问 `/ocr-admin` 调优 OCR 识别参数：
+
+- 🎚️ **参数调节**：文本置信度阈值、最小高度、最大边长
+- 🔀 **功能开关**：启用/禁用文本检测、分类、识别
+- 🖼️ **边框过滤**：忽略图片顶部/底部区域（过滤标题栏、水印等）
+- 💾 **实时生效**：点击「应用」立即测试效果，点击「保存」持久化配置
+- 🧪 **测试识别**：上传截图测试，显示原始 OCR 文本
+- 📋 **一键复制**：复制识别结果到剪贴板
+
 ### 📦 导出
 
 首页或详情页点击导出下拉菜单：
@@ -116,25 +130,27 @@ python app.py
 film-price-tracker/
 ├── 📄 app.py                  # Flask 入口
 ├── 🏭 app_factory.py          # Flask 工厂
-├── 🛤️ app_routes.py           # 路由（首页/详情/胶片管理/店铺管理/截图OCR）
+├── 🛤️ app_routes.py           # 路由（首页/详情/胶片管理/店铺管理/截图OCR/OCR管理）
 ├── ⚙️ config.py               # 配置（DB URI, Secret Key）
+├── 🔧 ocr_config.json         # OCR 引擎配置（置信度、检测开关、边框过滤）
 ├── 📋 requirements.txt        # Python 依赖
 ├── 🔵 start.ps1               # PowerShell 启动脚本（交互式菜单）
 ├── 🟢 start.bat               # CMD 启动脚本
-├── 📋 更新日志.md              # 更新日志
+├── 📋 ChangeLog.md            # 更新日志
 │
 ├── 📂 models/
 │   ├── __init__.py
 │   └── 🎞️ film.py             # ORM 模型：Film, PriceHistory, TaobaoStore
 │
 ├── 📂 templates/
-│   ├── 🏠 base.html           # 布局模板（导航栏、主题切换）
+│   ├── 🏠 base.html           # 布局模板（导航栏、主题切换、Toast 通知）
 │   ├── 📋 index.html          # 首页（双维度筛选：画幅+类型）
 │   ├── 📊 film_detail.html    # 详情页（价格趋势图表）
 │   ├── 📦 export.html         # 导出模板（自包含单文件 HTML）
 │   ├── 🎞️ films.html          # 胶片管理（卡片式布局）
 │   ├── 🏪 stores.html         # 店铺管理（卡片式+批量导入）
-│   └── 📸 upload.html         # 截图识别（粘贴/拖拽/上传+胶片匹配）
+│   ├── 📸 upload.html         # 截图识别（粘贴/拖拽/上传+胶片匹配）
+│   └── ⚙️ ocr_admin.html      # OCR 管理面板（参数调优+测试识别）
 │
 └── 🎨 static/css/style.css    # 全局样式（深色/浅色双主题）
 ```
@@ -249,7 +265,13 @@ SQLite 数据库 `film_prices.db`，包含三张表：
 | `/stores/edit/<id>` | POST | ✏️ 编辑店铺 |
 | `/stores/delete/<id>` | POST | 🗑️ 删除店铺 |
 | `/upload` | GET | 📸 截图识别页面 |
+| `/ocr-admin` | GET | ⚙️ OCR 管理面板 |
 | `/api/ocr` | POST | 🔤 OCR 识别接口 |
+| `/api/ocr-config` | GET | 📖 获取 OCR 配置 |
+| `/api/ocr-config` | POST | 🔄 实时应用 OCR 配置 |
+| `/api/ocr-config/save` | POST | 💾 保存 OCR 配置到文件 |
+| `/api/ocr/model-info` | GET | ℹ️ 获取 OCR 模型信息 |
+| `/api/ocr/test` | POST | 🧪 测试 OCR 识别（返回原始文本） |
 | `/api/save` | POST | 💾 保存识别结果 |
 | `/api/films/list` | GET | 🎞️ 胶片列表 JSON |
 | `/api/films/match` | POST | 🎯 胶片匹配 API |
@@ -263,11 +285,11 @@ SQLite 数据库 `film_prices.db`，包含三张表：
 
 ### 购物车截图
 
-📸 截图 → 🔤 OCR 提取文字 → 🔍 正则匹配价格 → 🎯 匹配数据库胶片 → 💾 保存到数据库
+📸 截图 → ⚙️ 应用 OCR 配置（置信度/边框过滤） → 🔤 OCR 提取文字 → 🔍 正则匹配价格 → 🎯 匹配数据库胶片 → 💾 保存到数据库
 
 ### 订单截图
 
-📸 截图 → 🔤 OCR 提取文字 → 🧾 检测订单格式 → 📋 解析标题/价格/数量 → 🎯 匹配数据库胶片 → 💾 保存（关联订单日期）
+📸 截图 → ⚙️ 应用 OCR 配置（置信度/边框过滤） → 🔤 OCR 提取文字 → 🧾 检测订单格式 → 📋 解析标题/价格/数量 → 🎯 匹配数据库胶片 → 💾 保存（关联订单日期）
 
 - 检测到订单日期/单号时自动切换为订单模式
 - 订单日期写入 `price_histories.timestamp`
@@ -276,6 +298,10 @@ SQLite 数据库 `film_prices.db`，包含三张表：
 - 匹配成功：自动关联胶片，显示绿色标签
 - 匹配失败：手动从下拉框选择胶片
 - 未选择：自动跳过，提示跳过数量
+
+### OCR 配置说明
+
+📸 上传截图 → ⚙️ 读取 `ocr_config.json` 配置 → 🔤 应用参数（text_score/use_det/use_cls/use_rec） → 🖼️ 裁剪忽略区域（ignore_top/ignore_bottom） → 🔤 执行 OCR → 📋 返回原始文本
 
 ## 🐛 已知问题
 
